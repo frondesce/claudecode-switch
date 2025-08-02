@@ -2,7 +2,7 @@
 
 > CLI wrapper that lets you switch between Claude Code-compatible providers (like Kimi, GLM, Qwen) with a single command.
 
-English | [中文版](#中文%E7%89%88%E6%96%87)
+English | [中文版](#zh)
 
 ---
 
@@ -117,6 +117,7 @@ To suppress future prompts, create this config:
 
 ---
 
+<a name="zh"></a>
 ## 中文版本文档
 
 ### 概览
