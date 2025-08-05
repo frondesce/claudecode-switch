@@ -115,6 +115,22 @@ To suppress future prompts, create this config:
 }
 ```
 
+## ⚠️ Updating Claude Code CLI
+
+When you run `npm install -g @anthropic-ai/claude-code@latest`,  
+npm recreates a *global symlink* `~/.nvm/.../bin/claude`.  
+If that symlink comes **before** `/usr/local/bin` in `$PATH`,  
+your custom wrapper will be bypassed → `ANTHROPIC_*` variables won’t be set.
+
+**Fix / Prevent**
+
+- Make sure `/usr/local/bin` is at the front of your `$PATH`  
+
+   ```bash
+   # ~/.bashrc (or ~/.zshrc)
+   export PATH="/usr/local/bin:$PATH"
+
+
 ---
 
 <a name="zh"></a>
@@ -137,6 +153,22 @@ claude kimi
 3. 在 `/usr/local/bin` 写入脚本 `claude`，读取 INI 并 export 环境变量
 4. 首次启动选择第 2 项 "Anthropic Console"，后续全程静默连接
 5. (可选)在 `~/.claude/settings.json` 写入 `{ "forceLoginMethod": "console" }`
+
+### ⚠️ 升级 Claude Code CLI
+
+使用 `npm install -g @anthropic-ai/claude-code@latest` 升级时，  
+npm 会在 `~/.nvm/.../bin` 重新生成一个名为 **claude** 的软链接。  
+如果该目录在 `$PATH` 中排在 `/usr/local/bin` 前面，  
+系统就会跳过你的包装脚本，导致 `ANTHROPIC_BASE_URL / AUTH_TOKEN`  
+没有注入，CLI 会报 “Invalid API key”。
+
+**解决 / 预防**
+
+- 把 `/usr/local/bin` 放到 `$PATH` 最前  
+
+   ```bash
+   # 写入 ~/.bashrc 或 ~/.zshrc
+   export PATH="/usr/local/bin:$PATH"
 
 ---
 
