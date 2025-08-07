@@ -12,7 +12,7 @@ English | [中文版](#zh)
 
 * Moonshot (Kimi)
 * Zhipu (GLM)
-* Qwen (coming soon)
+* Any API hub
 
 It works by intercepting your call to `claude`, applying the correct environment variables based on a simple INI file, and delegating to the real `claude` binary.
 
@@ -23,6 +23,8 @@ It works by intercepting your call to `claude`, applying the correct environment
 * ✨ One-command switching: `claude kimi`, `claude glm`, `claude qwen`
 * 📂 Unified config file: `~/claude_providers.ini`
 * ⚡ Fast and zero-login after first-time setup
+* 🔄 Default provider support: define `default=kimi` for fallback
+* 📋 View all providers: run `claude --list` to show available configs
 * ❌ Non-intrusive: preserves original `claude` as `claude-bin`
 * ✍ Customize or extend to more providers easily
 
@@ -40,6 +42,7 @@ sudo mv "$(command -v claude)" "$(dirname \"$(command -v claude)\")/claude-bin"
 
 ```ini
 # ~/claude_providers.ini
+default=kimi
 
 [kimi]
 BASE_URL=https://api.moonshot.cn/anthropic/
@@ -58,37 +61,80 @@ Save this as `/usr/local/bin/claude`:
 
 ```bash
 #!/usr/bin/env bash
-# Read ~/claude_providers.ini and switch the environment according to the first position parameter
+# Claude wrapper: auto switch environment via claude_providers.ini
+
 config="${CLAUDE_CONF:-$HOME/claude_providers.ini}"
 
-# Treat the first argument as a provider tag
-provider="$1"; shift
-
-# Allow direct input `claude` to call the original version
-if [[ "$provider" =~ ^[a-zA-Z0-9_-]+$ && -f "$config" ]]; then
-    # Get BASE_URL
-    base_url=$(awk -F'=' -v sec="[$provider]" '
-        $0==sec {f=1; next} /^\[/{f=0}
-        f && $1=="BASE_URL" {gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2}
+# Read default=xxx from ini (if it exists)
+default_provider=""
+if [[ -f "$config" ]]; then
+    default_provider=$(awk -F '=' '
+        $1 ~ /^[ \t]*default[ \t]*$/ {
+            gsub(/^[ \t]+|[ \t]+$/, "", $2);
+            print $2;
+            exit
+        }
     ' "$config")
-    # Get API_KEY
-    api_key=$(awk -F'=' -v sec="[$provider]" '
-        $0==sec {f=1; next} /^\[/{f=0}
-        f && $1=="API_KEY" {gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2}
-    ' "$config")
-
-    if [[ -z "$base_url" || -z "$api_key" ]]; then
-        echo "✖ No complete configuration found for [$provider] in $config" >&2; exit 1
-    fi
-
-    export ANTHROPIC_BASE_URL="$base_url"
-    export ANTHROPIC_AUTH_TOKEN="$api_key"
-else
-    # If no provider is specified, the parameters are returned as is.
-    set -- "$provider" "$@"
 fi
 
+# # Execute --list to display all available configurations
+if [[ "$1" == "--list" ]]; then
+    if [[ -f "$config" ]]; then
+        echo "Available Claude providers in $config:"
+        awk -v def="$default_provider" '
+            /^\[.*\]/ {
+                sec=substr($0, 2, length($0)-2);
+                if (sec == def) {
+                    printf "  - %s (default)\n", sec
+                } else {
+                    printf "  - %s\n", sec
+                }
+            }
+        ' "$config"
+    else
+        echo "⚠ Config file not found: $config"
+    fi
+    exit 0
+fi
 
+# Parsing provider: prioritize user-passed parameters, then fallback to default_provider
+provider="$1"
+if [[ ! "$provider" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+    provider="$default_provider"
+else
+    shift
+fi
+
+# If it is still empty, it means that no default is set and no parameters are passed in
+if [[ -z "$provider" ]]; then
+    echo "⚠ No provider specified, and no [default] mapping found in $config" >&2
+    exec "$(command -v claude-bin)" "$@"  # Start directly without configuration
+fi
+
+# Extract the configuration items of the provider
+base_url=$(awk -F '=' -v sec="[$provider]" '
+    $0 == sec {f=1; next} /^\[/{f=0}
+    f && $1=="BASE_URL" {gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2}
+' "$config")
+
+api_key=$(awk -F '=' -v sec="[$provider]" '
+    $0 == sec {f=1; next} /^\[/{f=0}
+    f && $1=="API_KEY" {gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2}
+' "$config")
+
+# Load environment variables
+if [[ -n "$base_url" && -n "$api_key" ]]; then
+    export ANTHROPIC_BASE_URL="$base_url"
+    export ANTHROPIC_AUTH_TOKEN="$api_key"
+
+    echo ">>> ANTHROPIC_BASE_URL=$ANTHROPIC_BASE_URL" >&2
+    echo ">>> ANTHROPIC_AUTH_TOKEN=$ANTHROPIC_AUTH_TOKEN" >&2
+else
+    echo "✖ Configuration for [$provider] is incomplete or missing." >&2
+    exit 1
+fi
+
+# Execute claude-bin
 exec "$(command -v claude-bin)" "$@"
 ```
 
@@ -98,10 +144,17 @@ Then:
 sudo chmod +x /usr/local/bin/claude
 ```
 
-### 4. First-time run
+### 4. Usage
+
+> Configure all providers in a single `~/.claude_providers.ini` file.
+
+#### ✅ Basic commands
 
 ```bash
-claude kimi
+claude kimi         # Use the [kimi] provider
+claude glm          # Use the [glm] provider
+claude              # Use the default provider (from `default=xxx`)
+claude --list       # List all available providers, highlight default
 ```
 
 Select option `2` (**Anthropic Console**) when prompted. After that, Claude CLI will remember the token.
