@@ -199,6 +199,24 @@ your custom wrapper will be bypassed → `ANTHROPIC_*` variables won’t be set.
 After that, your `/usr/local/bin/claude` wrapper will remain active,  
 and the CLI will work as expected — without `exec: : not found` or environment variable issues.
 
+**Note about `.bashrc` and `nvm`**:
+
+Even if you have already added:
+
+```bash
+export PATH=/usr/local/bin:$PATH
+```
+
+You must ensure this line appears after nvm is loaded.
+Otherwise, nvm will re-append its own bin path (e.g. ~/.nvm/.../bin) to the front of your $PATH, overriding your changes.
+
+If unsure, scroll to the bottom of your ~/.bashrc or ~/.zshrc and make sure the export PATH=/usr/local/bin:$PATH line comes after the following lines:
+
+```bash
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+```
+
 ---
 
 <a name="zh"></a>
@@ -253,6 +271,22 @@ npm 会在 `~/.nvm/.../bin` 重新生成一个名为 **claude** 的软链接。
 
 此后，您的 `/usr/local/bin/claude` 包装器将为正确状态， 
 并且 CLI 将按预期工作 - 没有`exec: : not found`或环境变量问题。
+
+**关于 .bashrc 和 nvm 的说明**
+
+即使你已经添加了以下内容：
+
+```bash
+export PATH=/usr/local/bin:$PATH
+```
+
+你仍需确保这一行写在 nvm 加载语句之后。
+否则，nvm 会将自己的 bin 路径（例如 `~/.nvm/.../bin`）重新添加到 `$PATH` 的最前面，从而覆盖你的设置。如果不确定，请打开你的 `~/.bashrc` 或 `~/.zshrc`，确认 `export PATH=/usr/local/bin:$PATH` 这一行位于以下几行之后：
+
+```bash
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+```
 
 ---
 
