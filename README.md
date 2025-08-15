@@ -1,304 +1,274 @@
-# claudecode-switch
+<a id="top"></a>
+# claudecode-switch 🚀
 
-> CLI wrapper that lets you switch between Claude Code-compatible providers (like Kimi, GLM, Qwen) with a single command.
+> CLI wrapper that lets you switch between Claude Code–compatible providers (like Kimi, GLM, Qwen) with a single command.
 
-English | [中文版](#zh)
+🌐 English | [中文版](#zh)
 
----
+A lightweight **PATH-based** wrapper for the official `@anthropic-ai/claude-code` CLI. It adds provider switching without modifying the official CLI.
 
-## Overview
+With the `~/bin/claude` wrapper, you can quickly switch among providers that are compatible with the Anthropic API (Kimi/Moonshot, GLM/Zhipu, etc.) while keeping the official CLI untouched.
 
-**claudecode-switch** is a lightweight wrapper script for the Claude Code CLI that allows you to quickly switch between different compatible API endpoints such as:
-
-* Moonshot (Kimi)
-* Zhipu (GLM)
-* Any API hub
-
-It works by intercepting your call to `claude`, applying the correct environment variables based on a simple INI file, and delegating to the real `claude` binary.
-
----
-
-## Features
-
-* ✨ One-command switching: `claude kimi`, `claude glm`, `claude qwen`
-* 📂 Unified config file: `~/claude_providers.ini`
-* ⚡ Fast and zero-login after first-time setup
-* 🔄 Default provider support: define `default=kimi` for fallback
-* 📋 View all providers: run `claude --list` to show available configs
-* ❌ Non-intrusive: preserves original `claude` as `claude-bin`
-* ✍ Customize or extend to more providers easily
-
----
-
-## Quickstart
-
-### 1. Backup the original CLI
-
-```bash
-sudo mv "$(command -v claude)" "$(dirname \"$(command -v claude)\")/claude-bin"
+✨ Runtime log is:
+```
+>>> Using provider: kimi
 ```
 
-### 2. Create provider config
+---
+
+## ✨ Features
+
+- **🛠️ One-click installer**: ensures Node/npm, installs the official CLI, and writes the wrapper.
+- 🧩 Multiple providers via `~/.claude_providers.ini`.
+- 🌟 `default=` to set a default provider.
+- 🔀 `claude <provider>` to select a provider on the fly.
+- 📜 `claude --list` to show providers (marks `(default)`).
+- 🎨 `status` subcommand with colored diagnostics.
+- ❌ `uninstall --purge` to remove both wrapper and config.
+- 🔒 Official CLI updates won’t overwrite the wrapper (PATH shadowing).
+
+---
+
+## 🛠️ Installation
+
+```bash
+bash scripts/install-claude-switch.sh
+# or explicitly
+bash scripts/install-claude-switch.sh install
+```
+
+What the installer does:
+
+1) Ensures Node.js/npm (tries system package manager, then falls back to NVM when possible)  
+2) Installs `@anthropic-ai/claude-code` globally  
+3) Adds `~/bin` to your PATH (idempotent)  
+4) Writes the wrapper to `~/bin/claude`  
+5) Creates a sample `~/.claude_providers.ini` if missing
+
+> Tip: After first install, open a new terminal (or run `hash -r`) so the new PATH takes effect.
+
+---
+
+## 🧩 Common Commands
+
+```bash
+# Use default provider (from ~/.claude_providers.ini)
+claude
+
+# Use a specific provider
+claude kimi
+claude glm
+
+# List all providers (default is marked)
+claude --list
+
+# Wrapper maintenance
+bash scripts/install-claude-switch.sh update
+bash scripts/install-claude-switch.sh uninstall
+bash scripts/install-claude-switch.sh uninstall --purge
+bash scripts/install-claude-switch.sh status   # colored diagnostics
+```
+
+---
+
+## 🗂️ Example Configuration
+
+File path: `~/.claude_providers.ini` (override with `CLAUDE_CONF=/path/to/ini`)
 
 ```ini
-# ~/claude_providers.ini
 default=kimi
 
 [kimi]
 BASE_URL=https://api.moonshot.cn/anthropic/
-API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxx
+API_KEY=sk-xxxxxxxxxxxxxxxx
 
 [glm]
 BASE_URL=https://open.bigmodel.cn/api/anthropic/
-API_KEY=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+API_KEY=xxxxxxxxxxxxxxxx
 ```
 
-> `API_KEY` and `BASE_URL` are required. Tokens can be found in each platform's developer dashboard.
+Resolution order:
 
-### 3. Create the wrapper script
+1) `claude <provider>` argument  
+2) `default=` in the INI  
+3) If neither is set, wrapper runs the official CLI without injecting envs
 
-Save this as `/usr/local/bin/claude`:
+Env variables exported for the official CLI:
 
+- `ANTHROPIC_BASE_URL`
+- `ANTHROPIC_AUTH_TOKEN`
+
+---
+
+## ⚙️ How It Works
+
+- We **don’t rename** or patch the official binary.  
+- A tiny wrapper lives at `~/bin/claude`; `~/bin` is placed **first** on your `PATH`.  
+- The wrapper reads your INI, exports envs, and invokes the official CLI via **absolute paths** to avoid recursion.  
+- Upgrading the official CLI is safe; the wrapper remains in your home directory and always wins on PATH.
+
+---
+
+## 🧪 Status & Troubleshooting
+
+Run:
 ```bash
-#!/usr/bin/env bash
-# Claude wrapper: auto switch environment via claude_providers.ini
-
-config="${CLAUDE_CONF:-$HOME/claude_providers.ini}"
-
-# Read default=xxx from ini (if it exists)
-default_provider=""
-if [[ -f "$config" ]]; then
-    default_provider=$(awk -F '=' '
-        $1 ~ /^[ \t]*default[ \t]*$/ {
-            gsub(/^[ \t]+|[ \t]+$/, "", $2);
-            print $2;
-            exit
-        }
-    ' "$config")
-fi
-
-# # Execute --list to display all available configurations
-if [[ "$1" == "--list" ]]; then
-    if [[ -f "$config" ]]; then
-        echo "Available Claude providers in $config:"
-        awk -v def="$default_provider" '
-            /^\[.*\]/ {
-                sec=substr($0, 2, length($0)-2);
-                if (sec == def) {
-                    printf "  - %s (default)\n", sec
-                } else {
-                    printf "  - %s\n", sec
-                }
-            }
-        ' "$config"
-    else
-        echo "⚠ Config file not found: $config"
-    fi
-    exit 0
-fi
-
-# Parsing provider: prioritize user-passed parameters, then fallback to default_provider
-provider="$1"
-if [[ ! "$provider" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-    provider="$default_provider"
-else
-    shift
-fi
-
-# If it is still empty, it means that no default is set and no parameters are passed in
-if [[ -z "$provider" ]]; then
-    echo "⚠ No provider specified, and no [default] mapping found in $config" >&2
-    exec "$(command -v claude-bin)" "$@"  # Start directly without configuration
-fi
-
-# Extract the configuration items of the provider
-base_url=$(awk -F '=' -v sec="[$provider]" '
-    $0 == sec {f=1; next} /^\[/{f=0}
-    f && $1=="BASE_URL" {gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2}
-' "$config")
-
-api_key=$(awk -F '=' -v sec="[$provider]" '
-    $0 == sec {f=1; next} /^\[/{f=0}
-    f && $1=="API_KEY" {gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2}
-' "$config")
-
-# Load environment variables
-if [[ -n "$base_url" && -n "$api_key" ]]; then
-    export ANTHROPIC_BASE_URL="$base_url"
-    export ANTHROPIC_AUTH_TOKEN="$api_key"
-
-    echo ">>> ANTHROPIC_BASE_URL=$ANTHROPIC_BASE_URL" >&2
-    echo ">>> ANTHROPIC_AUTH_TOKEN=$ANTHROPIC_AUTH_TOKEN" >&2
-else
-    echo "✖ Configuration for [$provider] is incomplete or missing." >&2
-    exit 1
-fi
-
-# Execute claude-bin
-exec "$(command -v claude-bin)" "$@"
+bash scripts/install-claude-switch.sh status
 ```
+You’ll see colored checks for:
 
-Then:
+- **claude command path** — should resolve to `~/bin/claude`
+- **Wrapper file exists** — verifies the wrapper is present
+- **Config file path** — shows the INI path or `<not found>`
+- **Default provider** — parsed from `default=`
+- **Providers available** — lists `[sections]` in the INI
 
-```bash
-sudo chmod +x /usr/local/bin/claude
+Common tips:
+
+- If `claude` doesn’t resolve to `~/bin/claude`, open a new terminal or run `hash -r`.
+- Ensure `~/bin` is **first** on your PATH.
+- Very old distros: use **NVM** to install Node 18+ if system packages are outdated.
+- Using `nvm`: keep the `export PATH="$HOME/bin:$PATH"` line **after** the `nvm` init lines in your shell rc.
+
+---
+
+## 📄 License
+
+This project is licensed under the **MIT License**. See the `LICENSE` file for details.
+
+
+---  
+
+<a id="zh"></a>
+
+# 🌏 claudecode-switch（简体中文）
+
+[Back to English](#top) | 中文版
+
+> 一个基于 PATH 的轻量封装器，为官方 `@anthropic-ai/claude-code` CLI 增加 **Provider 切换** 能力；无需修改官方 CLI。
+
+通过 `~/bin/claude` 包装器，你可以在不触碰官方执行文件的前提下，快速切换兼容 Anthropic API 的服务商（如 Kimi/Moonshot、GLM/智谱等）。
+
+✨ 运行日志为：
 ```
-
-### 4. Usage
-
-> Configure all providers in a single `~/.claude_providers.ini` file.
-
-#### ✅ Basic commands
-
-```bash
-claude kimi         # Use the [kimi] provider
-claude glm          # Use the [glm] provider
-claude              # Use the default provider (from `default=xxx`)
-claude --list       # List all available providers, highlight default
-```
-
-Select option `2` (**Anthropic Console**) when prompted. After that, Claude CLI will remember the token.
-
-To suppress future prompts, create this config:
-
-```json
-# ~/.claude/settings.json
-{
-  "forceLoginMethod": "console"
-}
-```
-
-## ⚠️ Updating Claude Code CLI
-
-When you run `npm install -g @anthropic-ai/claude-code@latest`,  
-npm recreates a *global symlink* `~/.nvm/.../bin/claude`.  
-If that symlink comes **before** `/usr/local/bin` in `$PATH`,  
-your custom wrapper will be bypassed → `ANTHROPIC_*` variables won’t be set.
-
-**Fix / Prevent**
-
-1. Make sure `/usr/local/bin` is at the front of your `$PATH`:
-
-   ```bash
-   # ~/.bashrc (or ~/.zshrc)
-   export PATH="/usr/local/bin:$PATH"
-   ```
-
-2. Immediately rename the autogenerated `claude` symlink to avoid wrapper conflict:
-
-   ```bash
-   mv "$(npm prefix -g)/bin/claude" "$(npm prefix -g)/bin/claude-bin"
-   ```
-
-3. Refresh your shell's command lookup cache:
-
-   ```bash
-   hash -r    # or use `rehash` if you're using zsh
-   ```
-
-After that, your `/usr/local/bin/claude` wrapper will remain active,  
-and the CLI will work as expected — without `exec: : not found` or environment variable issues.
-
-**Note about `.bashrc` and `nvm`**:
-
-Even if you have already added:
-
-```bash
-export PATH=/usr/local/bin:$PATH
-```
-
-You must ensure this line appears after nvm is loaded.
-Otherwise, nvm will re-append its own bin path (e.g. ~/.nvm/.../bin) to the front of your $PATH, overriding your changes.
-
-If unsure, scroll to the bottom of your ~/.bashrc or ~/.zshrc and make sure the export PATH=/usr/local/bin:$PATH line comes after the following lines:
-
-```bash
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+>>> Using provider: kimi
 ```
 
 ---
 
-<a name="zh"></a>
-## 中文版本文档
+## ✨ 功能点
 
-### 概览
+- **🛠️ 一键安装脚本**：自动安装 Node/npm、官方 CLI、包装器
+- 🧩 `~/.claude_providers.ini` 统一管理多 Provider
+- 🌟 `default=` 设置默认 Provider
+- 🔀 `claude <provider>` 临时切换指定 Provider
+- 📜 `claude --list` 列出所有 Provider（标注 `(default)`）
+- 🎨 `status` 子命令彩色查看环境状态
+- ❌ `uninstall --purge` 卸载并清理配置文件
+- 🔒 官方 CLI 升级不覆盖包装器（PATH 影子法）
 
-**claudecode-switch** 是 Claude Code 官方 CLI 的软装包装脚本，允许你通过一条命令：
+---
+
+## 🛠️ 安装
 
 ```bash
-claude kimi
+bash scripts/install-claude-switch.sh
+```
+或显式：
+```bash
+bash scripts/install-claude-switch.sh install
 ```
 
-快速切换到 Kimi、GLM、Qwen 等支持 Claude Code 协议的接口。
+脚本功能：
 
-### 全流程简要
+1) 检查/安装 Node.js 与 npm（优先包管理器，必要时回退 NVM）  
+2) 全局安装 `@anthropic-ai/claude-code`  
+3) 将 `~/bin` 添加到 PATH（可重复执行）  
+4) 写入包装器 `~/bin/claude`  
+5) 若缺失则生成示例 `~/.claude_providers.ini`
 
-1. 备份官方 `claude` 执行文件，改名为 `claude-bin`
-2. 新建 `~/claude_providers.ini`，一行一个配置 (BASE\_URL + API\_KEY)
-3. 在 `/usr/local/bin` 写入脚本 `claude`，读取 INI 并 export 环境变量
-4. 首次启动选择第 2 项 "Anthropic Console"，后续全程静默连接
-5. (可选)在 `~/.claude/settings.json` 写入 `{ "forceLoginMethod": "console" }`
+> 首次安装后建议重新打开一个终端（或执行 `hash -r`），让 PATH 设置生效。
 
-### ⚠️ 升级 Claude Code CLI
+---
 
-使用 `npm install -g @anthropic-ai/claude-code@latest` 升级时，  
-npm 会在 `~/.nvm/.../bin` 重新生成一个名为 **claude** 的软链接。  
-如果该目录在 `$PATH` 中排在 `/usr/local/bin` 前面，  
-系统就会跳过你的包装脚本，导致 `ANTHROPIC_BASE_URL / AUTH_TOKEN`  
-没有注入，CLI 会报 “Invalid API key”。
-
-**解决 / 预防**
-
-1. 确保 `/usr/local/bin` 位于 `$PATH`前面：
-
-   ```bash
-   # ~/.bashrc (or ~/.zshrc)
-   export PATH="/usr/local/bin:$PATH"
-   ```
-
-2. 重命名 `claude` 软链以避免冲突：
-
-   ```bash
-   mv "$(npm prefix -g)/bin/claude" "$(npm prefix -g)/bin/claude-bin"
-   ```
-
-3. 刷新 shell 的命令查找缓存：
-
-   ```bash
-   hash -r    # or use `rehash` if you're using zsh
-   ```
-
-此后，您的 `/usr/local/bin/claude` 包装器将为正确状态， 
-并且 CLI 将按预期工作 - 没有`exec: : not found`或环境变量问题。
-
-**关于 .bashrc 和 nvm 的说明**
-
-即使你已经添加了以下内容：
+## 💡 常用命令
 
 ```bash
-export PATH=/usr/local/bin:$PATH
-```
+claude              # 使用默认 Provider
+claude kimi         # 指定 kimi 启动
+claude glm          # 指定 glm 启动
+claude --list       # 列出 Provider（标注 default）
 
-你仍需确保这一行写在 nvm 加载语句之后。
-否则，nvm 会将自己的 bin 路径（例如 `~/.nvm/.../bin`）重新添加到 `$PATH` 的最前面，从而覆盖你的设置。如果不确定，请打开你的 `~/.bashrc` 或 `~/.zshrc`，确认 `export PATH=/usr/local/bin:$PATH` 这一行位于以下几行之后：
-
-```bash
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+# 包装器维护
+bash scripts/install-claude-switch.sh update
+bash scripts/install-claude-switch.sh uninstall
+bash scripts/install-claude-switch.sh uninstall --purge
+bash scripts/install-claude-switch.sh status
 ```
 
 ---
 
-## License
+## 📁 配置文件示例
 
-This project is licensed under the MIT License.
+路径：`~/.claude_providers.ini`（可用 `CLAUDE_CONF=/path/to/ini` 覆盖）
+
+```ini
+default=kimi
+
+[kimi]
+BASE_URL=https://api.moonshot.cn/anthropic/
+API_KEY=sk-xxxxxxxxxxxxxxxx
+
+[glm]
+BASE_URL=https://open.bigmodel.cn/api/anthropic/
+API_KEY=xxxxxxxxxxxxxxxx
+```
+
+解析优先级：
+
+1) 命令行 `claude <provider>`  
+2) INI 里的 `default=`  
+3) 若都没有，则直接启动官方 CLI（不注入 env）
+
+包装器会导出以下环境变量给官方 CLI：
+
+- `ANTHROPIC_BASE_URL`
+- `ANTHROPIC_AUTH_TOKEN`
 
 ---
 
-## Coming soon
+## ⚙️ 工作原理
 
-* Built-in shell autocompletion
-* Auto-install script
-* Support for Claude Code model flags
-* Token encryption or system keyring support
+- **不重命名/不修改** 官方二进制；  
+- 将包装器放在 `~/bin/claude`，并确保 `~/bin` 位于 PATH 前列；  
+- 运行时读取 INI，导出环境变量，再通过**绝对路径**调用官方 CLI；  
+- 升级官方 CLI 安全，不会覆盖包装器。
+
+---
+
+## 🧪 状态 & 故障排查
+
+运行：
+```bash
+bash scripts/install-claude-switch.sh status
+```
+你会看到彩色输出，包括：
+
+- **claude command path** → 目标为 `~/bin/claude`  
+- **Wrapper file exists** → 包装器脚本是否存在  
+- **Config file path** → 配置文件路径或 `<not found>`  
+- **Default provider** → 读取自 `default=`  
+- **Providers available** → INI 中的 `[section]` 列表
+
+常见建议：
+
+- 如果 `claude` 没解析到 `~/bin/claude`，请新开终端或执行 `hash -r`。  
+- 确保 `~/bin` 在 PATH **最前**。  
+- 老系统建议用 **NVM** 安装 Node 18+。  
+- 使用 `nvm` 时，保证 `export PATH="$HOME/bin:$PATH"` 写在 `nvm` 初始化语句**之后**。
+
+---
+
+## 📄 许可证 / License
+
+本项目采用 **MIT License** 授权。详见仓库根目录的 `LICENSE` 文件。
