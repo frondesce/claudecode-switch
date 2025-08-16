@@ -1,0 +1,10 @@
+# Shell scripts must use LF
+*.sh text eol=lf
+
+# docs keep LF
+*.md  text eol=lf
+*.txt text eol=lf
+
+# Windows scripts stay CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
