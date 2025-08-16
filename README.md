@@ -32,9 +32,9 @@ With the `~/bin/claude` wrapper, you can quickly switch among providers that are
 ## 🛠️ Installation
 
 ```bash
-bash scripts/install-claude-switch.sh
+bash scripts/cc-switch.sh
 # or explicitly
-bash scripts/install-claude-switch.sh install
+bash scripts/cc-switch.sh install
 ```
 
 What the installer does:
@@ -63,10 +63,10 @@ claude glm
 claude --list
 
 # Wrapper maintenance
-bash scripts/install-claude-switch.sh update
-bash scripts/install-claude-switch.sh uninstall
-bash scripts/install-claude-switch.sh uninstall --purge
-bash scripts/install-claude-switch.sh status   # colored diagnostics
+bash scripts/cc-switch.sh update
+bash scripts/cc-switch.sh uninstall
+bash scripts/cc-switch.sh uninstall --purge
+bash scripts/cc-switch.sh status   # colored diagnostics
 ```
 
 ---
@@ -113,7 +113,7 @@ Env variables exported for the official CLI:
 
 Run:
 ```bash
-bash scripts/install-claude-switch.sh status
+bash scripts/cc-switch.sh status
 ```
 You’ll see colored checks for:
 
@@ -172,11 +172,11 @@ This project is licensed under the **MIT License**. See the `LICENSE` file for d
 ## 🛠️ 安装
 
 ```bash
-bash scripts/install-claude-switch.sh
+bash scripts/cc-switch.sh
 ```
 或显式：
 ```bash
-bash scripts/install-claude-switch.sh install
+bash scripts/cc-switch.sh install
 ```
 
 脚本功能：
@@ -200,10 +200,10 @@ claude glm          # 指定 glm 启动
 claude --list       # 列出 Provider（标注 default）
 
 # 包装器维护
-bash scripts/install-claude-switch.sh update
-bash scripts/install-claude-switch.sh uninstall
-bash scripts/install-claude-switch.sh uninstall --purge
-bash scripts/install-claude-switch.sh status
+bash scripts/cc-switch.sh update
+bash scripts/cc-switch.sh uninstall
+bash scripts/cc-switch.sh uninstall --purge
+bash scripts/cc-switch.sh status
 ```
 
 ---
@@ -250,7 +250,7 @@ API_KEY=xxxxxxxxxxxxxxxx
 
 运行：
 ```bash
-bash scripts/install-claude-switch.sh status
+bash scripts/cc-switch.sh status
 ```
 你会看到彩色输出，包括：
 
