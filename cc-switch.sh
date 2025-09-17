@@ -119,7 +119,26 @@ ensure_node_npm() {
 
 ensure_claude_code_cli() {
   msg "Ensuring @anthropic-ai/claude-code is installed globally..."
-  npm i -g @anthropic-ai/claude-code >/dev/null 2>&1 || npm i -g @anthropic-ai/claude-code
+  if npm i -g @anthropic-ai/claude-code >/dev/null 2>&1; then
+    return
+  fi
+
+  warn "npm install failed. Attempting automatic cleanup and retry..."
+  npm uninstall -g @anthropic-ai/claude-code >/dev/null 2>&1 || true
+
+  local npm_root
+  npm_root="$(npm root -g 2>/dev/null || true)"
+  if [ -n "${npm_root}" ] && [ -d "${npm_root}/@anthropic-ai" ]; then
+    rm -rf "${npm_root}/@anthropic-ai/claude-code"
+    find "${npm_root}/@anthropic-ai" -maxdepth 1 -type d -name '.claude-code-*' -exec rm -rf {} +
+  fi
+
+  npm cache clean --force >/dev/null 2>&1 || true
+
+  if ! npm i -g @anthropic-ai/claude-code; then
+    err "Failed to install @anthropic-ai/claude-code automatically."
+    exit 1
+  fi
 }
 
 # ------------------------
