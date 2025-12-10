@@ -4,8 +4,14 @@ set -euo pipefail
 # ========================
 # Config
 # ========================
-WRAPPER_PATH="${HOME}/bin/claude"
-CONF_PATH="${HOME}/.claude_providers.ini"
+TARGET_HOME="${HOME}"
+if [ -n "${SUDO_USER:-}" ] && [ "${SUDO_USER}" != "root" ]; then
+  ALT_HOME="$(getent passwd "$SUDO_USER" | cut -d: -f6)"
+  [ -n "$ALT_HOME" ] && TARGET_HOME="$ALT_HOME"
+fi
+
+WRAPPER_PATH="${TARGET_HOME}/bin/claude"
+CONF_PATH="${TARGET_HOME}/.claude_providers.ini"
 MIN_NODE_VERSION="20.0.0"
 
 # ========================
@@ -36,23 +42,23 @@ append_once() {
 
 detect_shell_rc() {
   if [ -n "${ZSH_VERSION:-}" ]; then
-    echo "${HOME}/.zshrc"
+    echo "${TARGET_HOME}/.zshrc"
   elif [ -n "${BASH_VERSION:-}" ]; then
-    echo "${HOME}/.bashrc"
+    echo "${TARGET_HOME}/.bashrc"
   else
-    echo "${HOME}/.bashrc"
+    echo "${TARGET_HOME}/.bashrc"
   fi
 }
 
 ensure_path_prefix() {
   local rc; rc="$(detect_shell_rc)"
-  mkdir -p "${HOME}/bin"
-  local export_line='export PATH="$HOME/bin:$PATH"'
+  mkdir -p "${TARGET_HOME}/bin"
+  local export_line='export PATH="$TARGET_HOME/bin:$PATH"'
   append_once "$rc" "$export_line"
   # idempotent patch to common rc files
-  [ "$rc" != "${HOME}/.bashrc" ] && [ -f "${HOME}/.bashrc" ] && append_once "${HOME}/.bashrc" "$export_line"
-  [ "$rc" != "${HOME}/.zshrc" ] && [ -f "${HOME}/.zshrc" ] && append_once "${HOME}/.zshrc" "$export_line"
-  export PATH="$HOME/bin:$PATH"
+  [ "$rc" != "${TARGET_HOME}/.bashrc" ] && [ -f "${TARGET_HOME}/.bashrc" ] && append_once "${TARGET_HOME}/.bashrc" "$export_line"
+  [ "$rc" != "${TARGET_HOME}/.zshrc" ] && [ -f "${TARGET_HOME}/.zshrc" ] && append_once "${TARGET_HOME}/.zshrc" "$export_line"
+  export PATH="${TARGET_HOME}/bin:$PATH"
 }
 
 ensure_curl() {
@@ -91,7 +97,7 @@ ensure_curl() {
 }
 
 load_nvm_env() {
-  export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+  export NVM_DIR="${NVM_DIR:-$TARGET_HOME/.nvm}"
   if [ -s "${NVM_DIR}/nvm.sh" ]; then
     # shellcheck disable=SC1090
     . "${NVM_DIR}/nvm.sh"
@@ -140,7 +146,7 @@ install_node_with_nvm() {
     warn "curl not found; cannot fetch nvm installer. Install curl or node ${MIN_NODE_VERSION}+ manually."
     return 1
   fi
-  export NVM_DIR="${HOME}/.nvm"
+  export NVM_DIR="${TARGET_HOME}/.nvm"
   if [ ! -s "${NVM_DIR}/nvm.sh" ]; then
     curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
   fi
