@@ -90,6 +90,18 @@ ensure_curl() {
   return 1
 }
 
+load_nvm_env() {
+  export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+  if [ -s "${NVM_DIR}/nvm.sh" ]; then
+    # shellcheck disable=SC1090
+    . "${NVM_DIR}/nvm.sh"
+    # shellcheck disable=SC1090
+    [ -s "${NVM_DIR}/bash_completion" ] && . "${NVM_DIR}/bash_completion"
+    return 0
+  fi
+  return 1
+}
+
 # ------------------------
 # Node/npm installation
 # ------------------------
@@ -132,8 +144,7 @@ install_node_with_nvm() {
   if [ ! -s "${NVM_DIR}/nvm.sh" ]; then
     curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
   fi
-  # shellcheck disable=SC1090
-  [ -s "${NVM_DIR}/nvm.sh" ] && . "${NVM_DIR}/nvm.sh"
+  load_nvm_env || return 1
   nvm install 20 || {
     warn "nvm install 20 failed. Retrying with mirror NODEJS_ORG_MIRROR=https://npmmirror.com/mirrors/node ..."
     NODEJS_ORG_MIRROR=https://npmmirror.com/mirrors/node nvm install 20
@@ -174,9 +185,13 @@ ensure_node_npm() {
     warn "Package manager provided node $(node -v), which is below ${MIN_NODE_VERSION}. Falling back to NVM..."
   fi
 
-  if install_node_with_nvm && have_cmd node && have_cmd npm && node_version_ok; then
-    msg "Installed node/npm via NVM: $(node -v)"
-    return 0
+  if install_node_with_nvm; then
+    load_nvm_env && nvm use 20 >/dev/null 2>&1 || true
+    hash -r
+    if have_cmd node && have_cmd npm && node_version_ok; then
+      msg "Installed node/npm via NVM: $(node -v)"
+      return 0
+    fi
   fi
 
   err "Failed to install/upgrade node/npm to ${MIN_NODE_VERSION}+ automatically. Please install manually and re-run."
