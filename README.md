@@ -48,6 +48,8 @@ What the installer does:
 5) Creates a sample `~/.claude_providers.ini` if missing (new format for Claude Code >= 2.0)  
 6) If `npm -g` lacks permissions, falls back to installing CLI under `~/.npm-global` and adds it to PATH
 
+Note: when using NVM, if downloading the official Node binary fails, the installer auto-retries with `NODEJS_ORG_MIRROR=https://npmmirror.com/mirrors/node` to avoid slow source builds.
+
 > Tip: After first install, open a new terminal (or run `hash -r`) so the new PATH takes effect.
 
 ---

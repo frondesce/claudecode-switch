@@ -90,7 +90,10 @@ install_node_with_nvm() {
   fi
   # shellcheck disable=SC1090
   [ -s "${NVM_DIR}/nvm.sh" ] && . "${NVM_DIR}/nvm.sh"
-  nvm install 18
+  nvm install 18 || {
+    warn "nvm install 18 failed. Retrying with mirror NODEJS_ORG_MIRROR=https://npmmirror.com/mirrors/node ..."
+    NODEJS_ORG_MIRROR=https://npmmirror.com/mirrors/node nvm install 18
+  }
   nvm use 18
 }
 
