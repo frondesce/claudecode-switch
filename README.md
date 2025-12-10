@@ -139,6 +139,7 @@ Common tips:
 - If `claude` doesn’t resolve to `~/bin/claude`, open a new terminal or run `hash -r`.
 - Ensure `~/bin` is **first** on your PATH.
 - Node 20+ is required; if an older Node is present, the installer will try to upgrade via NodeSource/NVM (needs `curl`).
+- If `curl` is missing, the installer will prompt to install it via your package manager (requires sudo); otherwise please install curl manually.
 - Very old distros: use **NVM** to install Node 20+ if system packages are outdated.
 - Using `nvm`: keep the `export PATH="$HOME/bin:$PATH"` line **after** the `nvm` init lines in your shell rc.
 
@@ -285,6 +286,7 @@ bash scripts/cc-switch.sh status
 - 如果 `claude` 没解析到 `~/bin/claude`，请新开终端或执行 `hash -r`。  
 - 确保 `~/bin` 在 PATH **最前**。  
 - 需要 Node 20+；若系统已有低版本，安装脚本会尝试通过 NodeSource/NVM 升级（需要 `curl`）。  
+- 如果缺少 `curl`，安装器会询问是否用包管理器安装（需 sudo）；否则请手动安装。  
 - 老系统建议用 **NVM** 安装 Node 20+。  
 - 使用 `nvm` 时，保证 `export PATH="$HOME/bin:$PATH"` 写在 `nvm` 初始化语句**之后**。  
 

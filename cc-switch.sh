@@ -55,6 +55,41 @@ ensure_path_prefix() {
   export PATH="$HOME/bin:$PATH"
 }
 
+ensure_curl() {
+  if have_cmd curl; then
+    return 0
+  fi
+
+  local installer=""
+  if have_cmd apt && can_sudo; then installer="apt"; fi
+  if have_cmd yum && can_sudo; then installer="yum"; fi
+  if have_cmd pacman && can_sudo; then installer="pacman"; fi
+
+  if [[ -z "$installer" ]]; then
+    warn "curl not found and no usable package manager/sudo to auto-install."
+    return 1
+  fi
+
+  read -r -p "curl not found. Install curl via ${installer}? [Y/n]: " ans
+  case "$ans" in
+    n|N|no|NO) warn "Skipping curl install. Please install curl or node ${MIN_NODE_VERSION}+ manually."; return 1 ;;
+  esac
+
+  case "$installer" in
+    apt) sudo apt update && sudo apt install -y curl ;;
+    yum) sudo yum install -y curl ;;
+    pacman) sudo pacman -Sy --noconfirm curl ;;
+  esac
+
+  if have_cmd curl; then
+    msg "curl installed via ${installer}."
+    return 0
+  fi
+
+  warn "Failed to install curl via ${installer}. Please install manually."
+  return 1
+}
+
 # ------------------------
 # Node/npm installation
 # ------------------------
@@ -125,6 +160,10 @@ ensure_node_npm() {
     else
       warn "node found but version is below ${MIN_NODE_VERSION}: $(node -v). Attempting to install/upgrade..."
     fi
+  fi
+
+  if ! have_cmd curl; then
+    ensure_curl || warn "curl still missing; NodeSource and NVM may fail without it."
   fi
 
   warn "node/npm not found or too old. Attempting installation..."
