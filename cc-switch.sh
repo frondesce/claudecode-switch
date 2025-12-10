@@ -6,6 +6,7 @@ set -euo pipefail
 # ========================
 WRAPPER_PATH="${HOME}/bin/claude"
 CONF_PATH="${HOME}/.claude_providers.ini"
+MIN_NODE_VERSION="20.0.0"
 
 # ========================
 # Colors
@@ -59,6 +60,10 @@ ensure_path_prefix() {
 # ------------------------
 install_node_with_pkgmgr() {
   if have_cmd apt && can_sudo; then
+    if ! have_cmd curl; then
+      warn "curl not found; skipping NodeSource install. Install curl or node ${MIN_NODE_VERSION}+ manually."
+      return 1
+    fi
     msg "Installing node/npm via apt (NodeSource 20.x)..."
     curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
     sudo apt install -y nodejs
@@ -84,6 +89,10 @@ install_node_with_pkgmgr() {
 
 install_node_with_nvm() {
   msg "Installing node/npm via NVM (no sudo required)..."
+  if ! have_cmd curl; then
+    warn "curl not found; cannot fetch nvm installer. Install curl or node ${MIN_NODE_VERSION}+ manually."
+    return 1
+  fi
   export NVM_DIR="${HOME}/.nvm"
   if [ ! -s "${NVM_DIR}/nvm.sh" ]; then
     curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
@@ -97,26 +106,41 @@ install_node_with_nvm() {
   nvm use 20
 }
 
-ensure_node_npm() {
-  if have_cmd node && have_cmd npm; then
-    msg "node & npm found: $(node -v) / npm $(npm -v)"
+node_version_ok() {
+  local ver
+  ver="$(node -v 2>/dev/null || true)"
+  ver="${ver#v}"
+  [[ -z "$ver" ]] && return 1
+  if [[ "$(printf "%s\n%s\n" "$MIN_NODE_VERSION" "$ver" | sort -V | head -n1)" == "$MIN_NODE_VERSION" ]]; then
     return 0
   fi
-  warn "node/npm not found. Attempting installation..."
-  if install_node_with_pkgmgr; then
-    if have_cmd node && have_cmd npm; then
-      msg "Installed node/npm via package manager."
+  return 1
+}
+
+ensure_node_npm() {
+  if have_cmd node && have_cmd npm; then
+    if node_version_ok; then
+      msg "node & npm found: $(node -v) / npm $(npm -v)"
       return 0
+    else
+      warn "node found but version is below ${MIN_NODE_VERSION}: $(node -v). Attempting to install/upgrade..."
     fi
   fi
-  if have_cmd curl; then
-    install_node_with_nvm
-    if have_cmd node && have_cmd npm; then
-      msg "Installed node/npm via NVM: $(node -v)"
-      return 0
-    fi
+
+  warn "node/npm not found or too old. Attempting installation..."
+  if install_node_with_pkgmgr && have_cmd node && have_cmd npm && node_version_ok; then
+    msg "Installed node/npm via package manager: $(node -v)"
+    return 0
+  elif have_cmd node && have_cmd npm && ! node_version_ok; then
+    warn "Package manager provided node $(node -v), which is below ${MIN_NODE_VERSION}. Falling back to NVM..."
   fi
-  err "Failed to install node/npm automatically. Please install manually and re-run."
+
+  if install_node_with_nvm && have_cmd node && have_cmd npm && node_version_ok; then
+    msg "Installed node/npm via NVM: $(node -v)"
+    return 0
+  fi
+
+  err "Failed to install/upgrade node/npm to ${MIN_NODE_VERSION}+ automatically. Please install manually and re-run."
   exit 1
 }
 
