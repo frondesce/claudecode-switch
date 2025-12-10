@@ -138,7 +138,7 @@ Common tips:
 
 - If `claude` doesn’t resolve to `~/bin/claude`, open a new terminal or run `hash -r`.
 - Ensure `~/bin` is **first** on your PATH.
-- Very old distros: use **NVM** to install Node 18+ if system packages are outdated.
+- Very old distros: use **NVM** to install Node 20+ if system packages are outdated.
 - Using `nvm`: keep the `export PATH="$HOME/bin:$PATH"` line **after** the `nvm` init lines in your shell rc.
 
 ---
@@ -283,7 +283,7 @@ bash scripts/cc-switch.sh status
 
 - 如果 `claude` 没解析到 `~/bin/claude`，请新开终端或执行 `hash -r`。  
 - 确保 `~/bin` 在 PATH **最前**。  
-- 老系统建议用 **NVM** 安装 Node 18+。  
+- 老系统建议用 **NVM** 安装 Node 20+。  
 - 使用 `nvm` 时，保证 `export PATH="$HOME/bin:$PATH"` 写在 `nvm` 初始化语句**之后**。
 
 ---

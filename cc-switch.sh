@@ -59,8 +59,8 @@ ensure_path_prefix() {
 # ------------------------
 install_node_with_pkgmgr() {
   if have_cmd apt && can_sudo; then
-    msg "Installing node/npm via apt (NodeSource 18.x)..."
-    curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+    msg "Installing node/npm via apt (NodeSource 20.x)..."
+    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
     sudo apt install -y nodejs
     return 0
   fi
@@ -90,11 +90,11 @@ install_node_with_nvm() {
   fi
   # shellcheck disable=SC1090
   [ -s "${NVM_DIR}/nvm.sh" ] && . "${NVM_DIR}/nvm.sh"
-  nvm install 18 || {
-    warn "nvm install 18 failed. Retrying with mirror NODEJS_ORG_MIRROR=https://npmmirror.com/mirrors/node ..."
-    NODEJS_ORG_MIRROR=https://npmmirror.com/mirrors/node nvm install 18
+  nvm install 20 || {
+    warn "nvm install 20 failed. Retrying with mirror NODEJS_ORG_MIRROR=https://npmmirror.com/mirrors/node ..."
+    NODEJS_ORG_MIRROR=https://npmmirror.com/mirrors/node nvm install 20
   }
-  nvm use 18
+  nvm use 20
 }
 
 ensure_node_npm() {
