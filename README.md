@@ -138,9 +138,11 @@ Common tips:
 
 - If `claude` doesn’t resolve to `~/bin/claude`, open a new terminal or run `hash -r`.
 - Ensure `~/bin` is **first** on your PATH.
-- Node 20+ is required; if an older Node is present, the installer will try to upgrade via NodeSource/NVM (needs `curl`).
+- Node 20+ is required; if glibc < 2.28 is detected, the installer automatically falls back to Node 18 for compatibility. It will try to upgrade via NodeSource/NVM (needs `curl`). If an existing nvm-installed Node is still glibc-incompatible, the script will attempt an NVM source build; otherwise you may need to rebuild manually (e.g. `nvm uninstall 18 && nvm install -s 18`).
 - If `curl` is missing, the installer will prompt to install it via your package manager (requires sudo); otherwise please install curl manually.
 - When falling back to NVM, the installer reloads nvm and switches to Node 20 so that the new node/npm are available in the current shell (avoids false failures).
+- Debug mode: set `CLAUDE_SWITCH_DEBUG=1` to print extra diagnostics (PATH, node resolution) if installation has issues.
+  - When run as root (or via sudo), the installer can auto-install curl via apt/yum/pacman without needing passwordless sudo.
 - Very old distros: use **NVM** to install Node 20+ if system packages are outdated.
 - Using `nvm`: keep the `export PATH="$HOME/bin:$PATH"` line **after** the `nvm` init lines in your shell rc.
 
@@ -286,9 +288,11 @@ bash scripts/cc-switch.sh status
 
 - 如果 `claude` 没解析到 `~/bin/claude`，请新开终端或执行 `hash -r`。  
 - 确保 `~/bin` 在 PATH **最前**。  
-- 需要 Node 20+；若系统已有低版本，安装脚本会尝试通过 NodeSource/NVM 升级（需要 `curl`）。  
+- 需要 Node 20+；若检测到 glibc < 2.28，会自动回退到 Node 18 以兼容旧系统。脚本会尝试通过 NodeSource/NVM 升级（需要 `curl`）。若已有 nvm 的 Node 仍因 glibc 不兼容，脚本会尝试 NVM 源码编译；失败则可手动 `nvm uninstall 18 && nvm install -s 18` 重建。
 - 如果缺少 `curl`，安装器会询问是否用包管理器安装（需 sudo）；否则请手动安装。  
 - 回退到 NVM 时，安装器会重新加载 nvm 并切到 Node 20，确保当前 shell 能识别新 node/npm，避免“假失败”。  
+- 调试模式：若安装有问题，可先设 `CLAUDE_SWITCH_DEBUG=1`，脚本会输出额外诊断信息（PATH、node 检测）。  
+  - 以 root/sudo 运行时，脚本可以通过 apt/yum/pacman 自动安装 curl（不要求免密 sudo）。  
 - 老系统建议用 **NVM** 安装 Node 20+。  
 - 使用 `nvm` 时，保证 `export PATH="$HOME/bin:$PATH"` 写在 `nvm` 初始化语句**之后**。  
 

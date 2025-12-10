@@ -13,6 +13,12 @@ fi
 WRAPPER_PATH="${TARGET_HOME}/bin/claude"
 CONF_PATH="${TARGET_HOME}/.claude_providers.ini"
 MIN_NODE_VERSION="20.0.0"
+NODE_MAJOR="20"
+NODE_DISTRO_URL="https://deb.nodesource.com/setup_20.x"
+DEBUG_FLAG="${CLAUDE_SWITCH_DEBUG:-0}"
+NODE_GLIBC_INCOMPAT="0"
+GLIBC_BELOW_228="0"
+CURL_ATTEMPTED=0
 
 # ========================
 # Colors
@@ -24,14 +30,18 @@ CYAN="\033[0;36m"
 BOLD="\033[1m"
 NC="\033[0m"
 
+[ "$DEBUG_FLAG" != "0" ] && set -x
+
 # ========================
 # Helpers
 # ========================
 msg()  { printf "${GREEN}%s${NC}\n" "$*"; }
 warn() { printf "${YELLOW}%s${NC}\n" "$*"; }
 err()  { printf "${RED}%s${NC}\n" "$*" >&2; }
+dbg()  { [ "$DEBUG_FLAG" != "0" ] && printf "[DEBUG] %s\n" "$*" >&2; }
 have_cmd() { command -v "$1" >/dev/null 2>&1; }
 can_sudo() { have_cmd sudo && sudo -n true 2>/dev/null; }
+is_root() { [ "$(id -u)" -eq 0 ]; }
 
 append_once() {
   # append_once <file> <line>
@@ -50,6 +60,37 @@ detect_shell_rc() {
   fi
 }
 
+detect_glibc_version() {
+  local v
+  v="$(ldd --version 2>&1 | head -n1 | sed -E 's/.* ([0-9]+\.[0-9]+).*/\1/')" || true
+  echo "${v}"
+}
+
+glibc_lt_2_28() {
+  local v; v="$(detect_glibc_version)"
+  [[ -z "$v" ]] && return 1
+  if [[ "$(printf "%s\n%s\n" "2.28" "$v" | sort -V | head -n1)" == "$v" ]] && [[ "$v" != "2.28" ]]; then
+    return 0
+  fi
+  return 1
+}
+
+set_node_version_defaults() {
+  # Default to Node 20; fall back to 18 on older glibc
+  MIN_NODE_VERSION="20.0.0"
+  NODE_MAJOR="20"
+  NODE_DISTRO_URL="https://deb.nodesource.com/setup_20.x"
+  GLIBC_BELOW_228="0"
+
+  if glibc_lt_2_28; then
+    warn "Detected glibc < 2.28; falling back to Node 18 for compatibility."
+    MIN_NODE_VERSION="18.0.0"
+    NODE_MAJOR="18"
+    NODE_DISTRO_URL="https://deb.nodesource.com/setup_18.x"
+    GLIBC_BELOW_228="1"
+  fi
+}
+
 ensure_path_prefix() {
   local rc; rc="$(detect_shell_rc)"
   mkdir -p "${TARGET_HOME}/bin"
@@ -62,14 +103,19 @@ ensure_path_prefix() {
 }
 
 ensure_curl() {
+  if [ "$CURL_ATTEMPTED" -eq 1 ]; then
+    if have_cmd curl; then return 0; else warn "curl still missing (skipping repeated prompts)."; return 1; fi
+  fi
+  CURL_ATTEMPTED=1
+
   if have_cmd curl; then
     return 0
   fi
 
   local installer=""
-  if have_cmd apt && can_sudo; then installer="apt"; fi
-  if have_cmd yum && can_sudo; then installer="yum"; fi
-  if have_cmd pacman && can_sudo; then installer="pacman"; fi
+  if have_cmd apt && (can_sudo || is_root); then installer="apt"; fi
+  if have_cmd yum && (can_sudo || is_root); then installer="yum"; fi
+  if have_cmd pacman && (can_sudo || is_root); then installer="pacman"; fi
 
   if [[ -z "$installer" ]]; then
     warn "curl not found and no usable package manager/sudo to auto-install."
@@ -82,9 +128,9 @@ ensure_curl() {
   esac
 
   case "$installer" in
-    apt) sudo apt update && sudo apt install -y curl ;;
-    yum) sudo yum install -y curl ;;
-    pacman) sudo pacman -Sy --noconfirm curl ;;
+    apt) if is_root; then apt update && apt install -y curl; else sudo apt update && sudo apt install -y curl; fi ;;
+    yum) if is_root; then yum install -y curl; else sudo yum install -y curl; fi ;;
+    pacman) if is_root; then pacman -Sy --noconfirm curl; else sudo pacman -Sy --noconfirm curl; fi ;;
   esac
 
   if have_cmd curl; then
@@ -108,17 +154,41 @@ load_nvm_env() {
   return 1
 }
 
+set_nvm_path_if_valid() {
+  local ver bin latest_dir
+  shopt -s nullglob
+  local dirs=( "${TARGET_HOME}/.nvm/versions/node"/v"${NODE_MAJOR}."* )
+  shopt -u nullglob
+  if (( ${#dirs[@]} == 0 )); then
+    return 1
+  fi
+  latest_dir="$(printf '%s\n' "${dirs[@]}" | sort -V | tail -n1)"
+  [[ -z "$latest_dir" ]] && return 1
+  bin="${latest_dir%/}/bin"
+  [[ -x "${bin}/node" ]] || return 1
+  ver="$("${bin}/node" -v 2>/dev/null || true)"
+  ver="${ver#v}"
+  [[ -z "$ver" ]] && return 1
+  if [[ "$(printf "%s\n%s\n" "$MIN_NODE_VERSION" "$ver" | sort -V | head -n1)" != "$MIN_NODE_VERSION" ]]; then
+    return 1
+  fi
+  export PATH="${bin}:${PATH}"
+  hash -r
+  return 0
+}
+
 # ------------------------
 # Node/npm installation
 # ------------------------
 install_node_with_pkgmgr() {
+  if [[ "$GLIBC_BELOW_228" == "1" ]]; then
+    warn "glibc < 2.28 detected; skipping package-manager binaries and using NVM source build instead."
+    return 1
+  fi
   if have_cmd apt && can_sudo; then
-    if ! have_cmd curl; then
-      warn "curl not found; skipping NodeSource install. Install curl or node ${MIN_NODE_VERSION}+ manually."
-      return 1
-    fi
-    msg "Installing node/npm via apt (NodeSource 20.x)..."
-    curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+    ensure_curl || return 1
+    msg "Installing node/npm via apt (NodeSource ${NODE_MAJOR}.x)..."
+    curl -fsSL "${NODE_DISTRO_URL}" | sudo -E bash -
     sudo apt install -y nodejs
     return 0
   fi
@@ -151,18 +221,50 @@ install_node_with_nvm() {
     curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
   fi
   load_nvm_env || return 1
-  nvm install 20 || {
-    warn "nvm install 20 failed. Retrying with mirror NODEJS_ORG_MIRROR=https://npmmirror.com/mirrors/node ..."
-    NODEJS_ORG_MIRROR=https://npmmirror.com/mirrors/node nvm install 20
-  }
-  nvm use 20
+  dbg "Using NVM at ${NVM_DIR}"
+  if [[ "$GLIBC_BELOW_228" == "1" ]]; then
+    # Avoid glibc-mismatched prebuilt binaries; build from source directly.
+    nvm install -s "${NODE_MAJOR}" || return 1
+  else
+    nvm install "${NODE_MAJOR}" || {
+      warn "nvm install ${NODE_MAJOR} failed. Retrying with mirror NODEJS_ORG_MIRROR=https://npmmirror.com/mirrors/node ..."
+      NODEJS_ORG_MIRROR=https://npmmirror.com/mirrors/node nvm install "${NODE_MAJOR}" || return 1
+    }
+  fi
+  nvm use "${NODE_MAJOR}" || return 1
+}
+
+install_node_with_nvm_source() {
+  msg "Retrying nvm install ${NODE_MAJOR} from source (may take several minutes)..."
+  load_nvm_env || return 1
+  nvm install -s "${NODE_MAJOR}" || return 1
+  nvm use "${NODE_MAJOR}" || return 1
+}
+
+try_nvm_source_build() {
+  if install_node_with_nvm_source; then
+    load_nvm_env && nvm use "${NODE_MAJOR}" >/dev/null 2>&1 || true
+    hash -r
+    if have_cmd node && have_cmd npm && node_version_ok; then
+      msg "Installed node/npm via NVM (source build): $(node -v)"
+      return 0
+    fi
+  fi
+  return 1
 }
 
 node_version_ok() {
-  local ver
-  ver="$(node -v 2>/dev/null || true)"
-  ver="${ver#v}"
+  local ver out
+  out="$(node -v 2>&1 || true)"
+  dbg "node_version_ok: raw_output='${out}'"
+  ver="${out#v}"
   [[ -z "$ver" ]] && return 1
+  # If the output still contains GLIBC warnings or non-version strings, treat as invalid
+  if [[ "$out" =~ GLIBC_ ]]; then
+    warn "node binary appears incompatible with current glibc (output: $out)"
+    NODE_GLIBC_INCOMPAT="1"
+    return 1
+  fi
   if [[ "$(printf "%s\n%s\n" "$MIN_NODE_VERSION" "$ver" | sort -V | head -n1)" == "$MIN_NODE_VERSION" ]]; then
     return 0
   fi
@@ -170,29 +272,64 @@ node_version_ok() {
 }
 
 ensure_node_npm() {
+  local _had_errexit=0
+  case "$-" in *e*) _had_errexit=1; set +e ;; esac
+  restore_errexit() { [ "$_had_errexit" -eq 1 ] && set -e; }
+  set_node_version_defaults
+  NODE_GLIBC_INCOMPAT="0"
+  dbg "ensure_node_npm: user=$USER sudo_user=${SUDO_USER:-} target_home=$TARGET_HOME PATH=$PATH"
+  local attempted_source_build=0
+  local current_node current_npm
+  current_node="$(command -v node 2>/dev/null || true)"
+  current_npm="$(command -v npm 2>/dev/null || true)"
+  dbg "ensure_node_npm: current node=${current_node:-<none>} npm=${current_npm:-<none>} version=$(node -v 2>/dev/null || echo '-')"
+  dbg "ensure_node_npm: start"
+
+  if set_nvm_path_if_valid && have_cmd node && have_cmd npm; then
+    if node_version_ok; then
+      msg "node & npm found (nvm): $(node -v) / npm $(npm -v)"
+      dbg "ensure_node_npm: early success via nvm path"
+      restore_errexit; return 0
+    else
+      warn "node found via nvm path but version/compatibility check failed; continuing installation..."
+    fi
+  fi
+
   if have_cmd node && have_cmd npm; then
     if node_version_ok; then
       msg "node & npm found: $(node -v) / npm $(npm -v)"
-      return 0
+      dbg "ensure_node_npm: success with existing node"
+      restore_errexit; return 0
     else
       warn "node found but version is below ${MIN_NODE_VERSION}: $(node -v). Attempting to install/upgrade..."
+      if [[ "$NODE_GLIBC_INCOMPAT" == "1" ]]; then
+        warn "Detected glibc mismatch with existing node. Attempting NVM source build..."
+        attempted_source_build=1
+        if try_nvm_source_build; then
+          restore_errexit; return 0
+        fi
+      fi
     fi
   fi
 
   if ! have_cmd curl; then
-    ensure_curl || warn "curl still missing; NodeSource and NVM may fail without it."
+    if ! ensure_curl; then
+      err "curl is required to install Node automatically. Please install curl and re-run."
+      restore_errexit; exit 1
+    fi
   fi
 
   warn "node/npm not found or too old. Attempting installation..."
   if install_node_with_pkgmgr && have_cmd node && have_cmd npm && node_version_ok; then
     msg "Installed node/npm via package manager: $(node -v)"
-    return 0
+    dbg "ensure_node_npm: success via pkgmgr"
+    restore_errexit; return 0
   elif have_cmd node && have_cmd npm && ! node_version_ok; then
     warn "Package manager provided node $(node -v), which is below ${MIN_NODE_VERSION}. Falling back to NVM..."
   fi
 
   if install_node_with_nvm; then
-    load_nvm_env && nvm use 20 >/dev/null 2>&1 || true
+    load_nvm_env && nvm use "${NODE_MAJOR}" >/dev/null 2>&1 || true
     # ensure PATH includes the selected nvm node bin even under sudo
     if command -v nvm >/dev/null 2>&1; then
       local nvm_node_bin
@@ -205,11 +342,39 @@ ensure_node_npm() {
     hash -r
     if have_cmd node && have_cmd npm && node_version_ok; then
       msg "Installed node/npm via NVM: $(node -v)"
-      return 0
+      dbg "ensure_node_npm: success via nvm after install"
+      restore_errexit; return 0
+    fi
+    if set_nvm_path_if_valid && have_cmd node && have_cmd npm; then
+      msg "Installed node/npm via NVM: $(node -v)"
+      dbg "ensure_node_npm: success via set_nvm_path_if_valid after install"
+      restore_errexit; return 0
+    fi
+    if [[ "$NODE_GLIBC_INCOMPAT" == "1" ]]; then
+      warn "NVM binary install is incompatible with current glibc; trying source build..."
+      attempted_source_build=1
+      if try_nvm_source_build; then
+        restore_errexit; return 0
+      fi
+    else
+      warn "NVM binary install may be incompatible; trying source build..."
+      attempted_source_build=1
+      if try_nvm_source_build; then
+        restore_errexit; return 0
+      fi
     fi
   fi
-
-  err "Failed to install/upgrade node/npm to ${MIN_NODE_VERSION}+ automatically. Please install manually and re-run."
+  if [[ "$NODE_GLIBC_INCOMPAT" == "1" && "$attempted_source_build" -eq 0 ]]; then
+    warn "Detected glibc mismatch; attempting NVM source build as final fallback..."
+    if try_nvm_source_build; then
+      restore_errexit; return 0
+    fi
+  fi
+  dbg "ensure_node_npm: end (failure path)"
+  dbg "Final PATH=$PATH"
+  dbg "node=$(command -v node || echo '<none>') npm=$(command -v npm || echo '<none>') version=$(node -v 2>/dev/null || echo '<none>')"
+  err "Failed to install/upgrade node/npm to ${MIN_NODE_VERSION}+ automatically. Please install manually and re-run. (Set CLAUDE_SWITCH_DEBUG=1 for verbose logs)"
+  if [[ $_had_errexit -eq 1 ]]; then set -e; fi
   exit 1
 }
 
@@ -574,6 +739,7 @@ case "$CMD" in
   install)
     msg "Step 1/5: Ensuring node & npm..."
     ensure_node_npm
+    dbg "Step 1 completed"
     msg "Step 2/5: Ensuring official Claude Code CLI..."
     ensure_claude_code_cli
     msg "Step 3/5: Ensuring ~/bin in PATH..."
