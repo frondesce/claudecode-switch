@@ -193,6 +193,15 @@ ensure_node_npm() {
 
   if install_node_with_nvm; then
     load_nvm_env && nvm use 20 >/dev/null 2>&1 || true
+    # ensure PATH includes the selected nvm node bin even under sudo
+    if command -v nvm >/dev/null 2>&1; then
+      local nvm_node_bin
+      nvm_node_bin="$(nvm which current 2>/dev/null || true)"
+      if [[ -n "$nvm_node_bin" ]]; then
+        nvm_node_bin="${nvm_node_bin%/node}"
+        export PATH="${nvm_node_bin}:${PATH}"
+      fi
+    fi
     hash -r
     if have_cmd node && have_cmd npm && node_version_ok; then
       msg "Installed node/npm via NVM: $(node -v)"
