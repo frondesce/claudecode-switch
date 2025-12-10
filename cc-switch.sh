@@ -136,6 +136,23 @@ ensure_claude_code_cli() {
   npm cache clean --force >/dev/null 2>&1 || true
 
   if ! npm i -g @anthropic-ai/claude-code; then
+    warn "Global npm install failed (likely permissions). Trying user prefix ~/.npm-global..."
+    local user_prefix="${HOME}/.npm-global"
+    mkdir -p "${user_prefix}"
+    if npm config set prefix "${user_prefix}" >/dev/null 2>&1; then
+      export PATH="${user_prefix}/bin:${PATH}"
+      local rc; rc="$(detect_shell_rc)"
+      local export_line="export PATH=\"${user_prefix}/bin:\\\$PATH\""
+      append_once "$rc" "$export_line"
+      [ "$rc" != "${HOME}/.bashrc" ] && [ -f "${HOME}/.bashrc" ] && append_once "${HOME}/.bashrc" "$export_line"
+      [ "$rc" != "${HOME}/.zshrc" ] && [ -f "${HOME}/.zshrc" ] && append_once "${HOME}/.zshrc" "$export_line"
+      if npm i -g @anthropic-ai/claude-code; then
+        msg "Installed @anthropic-ai/claude-code into user prefix ${user_prefix}."
+        return
+      fi
+    else
+      warn "Failed to set npm user prefix; you may need to adjust npm permissions manually."
+    fi
     err "Failed to install @anthropic-ai/claude-code automatically."
     exit 1
   fi

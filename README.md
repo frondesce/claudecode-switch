@@ -45,7 +45,8 @@ What the installer does:
 2) Installs `@anthropic-ai/claude-code` globally  
 3) Adds `~/bin` to your PATH (idempotent)  
 4) Writes the wrapper to `~/bin/claude`  
-5) Creates a sample `~/.claude_providers.ini` if missing (new format for Claude Code >= 2.0)
+5) Creates a sample `~/.claude_providers.ini` if missing (new format for Claude Code >= 2.0)  
+6) If `npm -g` lacks permissions, falls back to installing CLI under `~/.npm-global` and adds it to PATH
 
 > Tip: After first install, open a new terminal (or run `hash -r`) so the new PATH takes effect.
 
