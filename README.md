@@ -14,6 +14,8 @@ With the `~/bin/claude` wrapper, you can quickly switch among providers that are
 >>> Using provider: kimi
 ```
 
+📌 Claude Code >= 2.0 change: the official CLI now reads credentials from `~/.claude/settings.json` (`env` block), not from shell env vars. The wrapper writes/updates that file for the chosen provider automatically.
+
 ---
 
 ## ✨ Features
@@ -43,7 +45,7 @@ What the installer does:
 2) Installs `@anthropic-ai/claude-code` globally  
 3) Adds `~/bin` to your PATH (idempotent)  
 4) Writes the wrapper to `~/bin/claude`  
-5) Creates a sample `~/.claude_providers.ini` if missing
+5) Creates a sample `~/.claude_providers.ini` if missing (new format for Claude Code >= 2.0)
 
 > Tip: After first install, open a new terminal (or run `hash -r`) so the new PATH takes effect.
 
@@ -79,24 +81,30 @@ File path: `~/.claude_providers.ini` (override with `CLAUDE_CONF=/path/to/ini`)
 default=kimi
 
 [kimi]
-BASE_URL=https://api.moonshot.cn/anthropic/
-API_KEY=sk-xxxxxxxxxxxxxxxx
+ANTHROPIC_AUTH_TOKEN=sk-xxxxxxxxxxxxxxxx
+ANTHROPIC_BASE_URL=https://api.kimi.com/coding/
+ANTHROPIC_MODEL=kimi-for-coding          ; optional
+ANTHROPIC_SMALL_FAST_MODE=kimi-for-coding ; optional
 
 [glm]
-BASE_URL=https://open.bigmodel.cn/api/anthropic/
-API_KEY=xxxxxxxxxxxxxxxx
+ANTHROPIC_AUTH_TOKEN=sk-xxxxxxxxxxxxxxxx
+ANTHROPIC_BASE_URL=https://open.bigmodel.cn/api/anthropic/
+ANTHROPIC_MODEL=glm-4-flash              ; optional
+ANTHROPIC_SMALL_FAST_MODE=glm-4-flash    ; optional
 ```
 
 Resolution order:
 
 1) `claude <provider>` argument  
 2) `default=` in the INI  
-3) If neither is set, wrapper runs the official CLI without injecting envs
+3) If neither is set, wrapper runs the official CLI without updating settings
 
-Env variables exported for the official CLI:
+When a provider is chosen, the wrapper writes these keys into `~/.claude/settings.json` → `env`:
 
-- `ANTHROPIC_BASE_URL`
-- `ANTHROPIC_AUTH_TOKEN`
+- `ANTHROPIC_AUTH_TOKEN` (required)
+- `ANTHROPIC_BASE_URL` (required)
+- `ANTHROPIC_MODEL` (optional; only written if present)
+- `ANTHROPIC_SMALL_FAST_MODE` (optional; only written if present)
 
 ---
 
@@ -104,7 +112,7 @@ Env variables exported for the official CLI:
 
 - We **don’t rename** or patch the official binary.  
 - A tiny wrapper lives at `~/bin/claude`; `~/bin` is placed **first** on your `PATH`.  
-- The wrapper reads your INI, exports envs, and invokes the official CLI via **absolute paths** to avoid recursion.  
+- The wrapper reads your INI, writes credentials into `~/.claude/settings.json` (`env` block), and invokes the official CLI via **absolute paths** to avoid recursion.  
 - Upgrading the official CLI is safe; the wrapper remains in your home directory and always wins on PATH.
 
 ---
@@ -153,6 +161,8 @@ This project is licensed under the **MIT License**. See the `LICENSE` file for d
 ```
 >>> Using provider: kimi
 ```
+
+📌 Claude Code 2.0 及以上：官方 CLI 从 `~/.claude/settings.json`（`env` 字段）读取密钥，不再读 shell 环境变量。包装器会为所选 Provider 自动写/更新该文件。
 
 ---
 
@@ -216,24 +226,30 @@ bash scripts/cc-switch.sh status
 default=kimi
 
 [kimi]
-BASE_URL=https://api.moonshot.cn/anthropic/
-API_KEY=sk-xxxxxxxxxxxxxxxx
+ANTHROPIC_AUTH_TOKEN=sk-xxxxxxxxxxxxxxxx
+ANTHROPIC_BASE_URL=https://api.kimi.com/coding/
+ANTHROPIC_MODEL=kimi-for-coding          ; 可选
+ANTHROPIC_SMALL_FAST_MODE=kimi-for-coding ; 可选
 
 [glm]
-BASE_URL=https://open.bigmodel.cn/api/anthropic/
-API_KEY=xxxxxxxxxxxxxxxx
+ANTHROPIC_AUTH_TOKEN=sk-xxxxxxxxxxxxxxxx
+ANTHROPIC_BASE_URL=https://open.bigmodel.cn/api/anthropic/
+ANTHROPIC_MODEL=glm-4-flash              ; 可选
+ANTHROPIC_SMALL_FAST_MODE=glm-4-flash    ; 可选
 ```
 
 解析优先级：
 
 1) 命令行 `claude <provider>`  
 2) INI 里的 `default=`  
-3) 若都没有，则直接启动官方 CLI（不注入 env）
+3) 若都没有，则直接启动官方 CLI（不更新 settings）
 
-包装器会导出以下环境变量给官方 CLI：
+选择 Provider 后，包装器会将以下键写入 `~/.claude/settings.json` 的 `env`：
 
-- `ANTHROPIC_BASE_URL`
-- `ANTHROPIC_AUTH_TOKEN`
+- `ANTHROPIC_AUTH_TOKEN`（必填）
+- `ANTHROPIC_BASE_URL`（必填）
+- `ANTHROPIC_MODEL`（可选，提供时写入）
+- `ANTHROPIC_SMALL_FAST_MODE`（可选，提供时写入）
 
 ---
 
@@ -241,7 +257,7 @@ API_KEY=xxxxxxxxxxxxxxxx
 
 - **不重命名/不修改** 官方二进制；  
 - 将包装器放在 `~/bin/claude`，并确保 `~/bin` 位于 PATH 前列；  
-- 运行时读取 INI，导出环境变量，再通过**绝对路径**调用官方 CLI；  
+- 运行时读取 INI，将凭据写入 `~/.claude/settings.json` 的 `env`，再通过**绝对路径**调用官方 CLI；  
 - 升级官方 CLI 安全，不会覆盖包装器。
 
 ---

@@ -151,6 +151,23 @@ write_wrapper() {
 set -euo pipefail
 
 CONFIG="${CLAUDE_CONF:-$HOME/.claude_providers.ini}"
+CLAUDE_DIR="${HOME}/.claude"
+SETTINGS_PATH="${CLAUDE_DIR}/settings.json"
+
+get_ini_value() {
+  local section="$1" key="$2"
+  awk -F '=' -v sec="[$section]" -v key="$key" '
+    $0==sec {f=1; next}
+    /^\[/{f=0}
+    f {
+      k=$1; gsub(/^[ \t]+|[ \t]+$/, "", k)
+      if (k==key) {
+        v=$2; gsub(/^[ \t]+|[ \t]+$/, "", v)
+        print v; exit
+      }
+    }
+  ' "$CONFIG" 2>/dev/null
+}
 
 # ---- read default ----
 default_provider=""
@@ -184,26 +201,69 @@ else
   provider="$default_provider"
 fi
 
-# Inject ANTHROPIC_* from INI if provider present
 if [[ -n "$provider" ]]; then
-  base_url=$(awk -F '=' -v sec="[$provider]" '
-    $0==sec {f=1; next} /^\[/{f=0}
-    f && $1=="BASE_URL" {gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2}
-  ' "$CONFIG" 2>/dev/null || true)
+  auth_token=$(get_ini_value "$provider" "ANTHROPIC_AUTH_TOKEN")
+  [[ -z "${auth_token:-}" ]] && auth_token=$(get_ini_value "$provider" "API_KEY") # backward compat
 
-  api_key=$(awk -F '=' -v sec="[$provider]" '
-    $0==sec {f=1; next} /^\[/{f=0}
-    f && $1=="API_KEY" {gsub(/^[ \t]+|[ \t]+$/, "", $2); print $2}
-  ' "$CONFIG" 2>/dev/null || true)
+  base_url=$(get_ini_value "$provider" "ANTHROPIC_BASE_URL")
+  [[ -z "${base_url:-}" ]] && base_url=$(get_ini_value "$provider" "BASE_URL") # backward compat
 
-  if [[ -n "${base_url:-}" && -n "${api_key:-}" ]]; then
-    export ANTHROPIC_BASE_URL="$base_url"
-    export ANTHROPIC_AUTH_TOKEN="$api_key"
-    >&2 echo ">>> Using provider: $provider"
-  else
-    echo "✖ Provider [$provider] has incomplete config (needs BASE_URL and API_KEY)." >&2
+  model=$(get_ini_value "$provider" "ANTHROPIC_MODEL")
+  [[ -z "${model:-}" ]] && model=$(get_ini_value "$provider" "MODEL")
+
+  small_fast=$(get_ini_value "$provider" "ANTHROPIC_SMALL_FAST_MODE")
+  [[ -z "${small_fast:-}" ]] && small_fast=$(get_ini_value "$provider" "SMALL_FAST_MODE")
+
+  missing=()
+  [[ -z "${auth_token:-}" ]] && missing+=("ANTHROPIC_AUTH_TOKEN")
+  [[ -z "${base_url:-}" ]] && missing+=("ANTHROPIC_BASE_URL")
+
+  if (( ${#missing[@]} > 0 )); then
+    printf "✖ Provider [%s] has incomplete config (missing: %s).\n" "$provider" "$(IFS=,; echo "${missing[*]}")" >&2
     exit 1
   fi
+
+  export SETTINGS_PATH PROVIDER="$provider"
+  export AUTH_TOKEN="$auth_token" BASE_URL="$base_url" MODEL="$model" SMALL_FAST="$small_fast"
+
+  node <<'NODE'
+const fs = require('fs');
+const path = require('path');
+
+const settingsPath = process.env.SETTINGS_PATH;
+const claudeDir = path.dirname(settingsPath);
+const envUpdates = {};
+const maybeSet = (key, val) => {
+  if (typeof val !== 'undefined' && val !== '') envUpdates[key] = val;
+};
+maybeSet('ANTHROPIC_AUTH_TOKEN', process.env.AUTH_TOKEN);
+maybeSet('ANTHROPIC_BASE_URL', process.env.BASE_URL);
+maybeSet('ANTHROPIC_MODEL', process.env.MODEL);
+maybeSet('ANTHROPIC_SMALL_FAST_MODE', process.env.SMALL_FAST);
+
+fs.mkdirSync(claudeDir, { recursive: true });
+
+let data = {};
+if (fs.existsSync(settingsPath)) {
+  try {
+    const raw = fs.readFileSync(settingsPath, 'utf8');
+    data = raw.trim() ? JSON.parse(raw) : {};
+  } catch (err) {
+    console.error(`✖ Failed to parse ${settingsPath}: ${err.message}`);
+    process.exit(1);
+  }
+}
+
+data.env = { ...(data.env || {}), ...envUpdates };
+if (!data.permissions) data.permissions = { allow: [], deny: [] };
+if (typeof data.alwaysThinkingEnabled === 'undefined') data.alwaysThinkingEnabled = true;
+
+fs.writeFileSync(settingsPath, JSON.stringify(data, null, 2));
+console.error(`>>> Updated ${settingsPath} for provider ${process.env.PROVIDER}`);
+NODE
+else
+  echo "✖ No provider selected and no default configured in $CONFIG" >&2
+  exit 1
 fi
 
 # ---- locate official CLI (absolute paths to avoid recursion) ----
@@ -249,12 +309,16 @@ default=kimi
 
 # Providers (Anthropic-compatible API)
 [kimi]
-BASE_URL=https://api.moonshot.cn/anthropic/
-API_KEY=sk-xxxxxxxxxxxxxxxx
+ANTHROPIC_AUTH_TOKEN=sk-xxxxxxxxxxxxxxxx
+ANTHROPIC_BASE_URL=https://api.kimi.com/coding/
+ANTHROPIC_MODEL=kimi-for-coding
+ANTHROPIC_SMALL_FAST_MODE=kimi-for-coding
 
 [glm]
-BASE_URL=https://open.bigmodel.cn/api/anthropic/
-API_KEY=xxxxxxxxxxxxxxxx
+ANTHROPIC_AUTH_TOKEN=sk-xxxxxxxxxxxxxxxx
+ANTHROPIC_BASE_URL=https://open.bigmodel.cn/api/anthropic/
+ANTHROPIC_MODEL=glm-4.5
+ANTHROPIC_SMALL_FAST_MODE=glm-4.5-air
 INI
   chmod 600 "$CONF_PATH" || true
 }
@@ -301,6 +365,13 @@ cmd_status() {
     fi
   else
     echo -e "Config file path: ${RED}<not found>${NC} (expected at ${CONF_PATH})"
+  fi
+
+  local SETTINGS_FILE="${HOME}/.claude/settings.json"
+  if [[ -f "$SETTINGS_FILE" ]]; then
+    echo -e "settings.json path: ${GREEN}${SETTINGS_FILE}${NC}"
+  else
+    echo -e "settings.json path: ${YELLOW}${SETTINGS_FILE}${NC} (will be created on first claude run)"
   fi
 }
 
