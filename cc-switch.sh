@@ -537,7 +537,7 @@ if (!data.permissions) data.permissions = { allow: [], deny: [] };
 if (typeof data.alwaysThinkingEnabled === 'undefined') data.alwaysThinkingEnabled = true;
 
 fs.writeFileSync(settingsPath, JSON.stringify(data, null, 2));
-console.error(`>>> Updated ${settingsPath} for provider ${process.env.PROVIDER}`);
+console.error(`>>> Using provider: ${process.env.PROVIDER}`);
 NODE
 else
   echo "✖ No provider selected and no default configured in $CONFIG" >&2
