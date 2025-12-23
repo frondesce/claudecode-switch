@@ -38,7 +38,12 @@ NC="\033[0m"
 msg()  { printf "${GREEN}%s${NC}\n" "$*"; }
 warn() { printf "${YELLOW}%s${NC}\n" "$*"; }
 err()  { printf "${RED}%s${NC}\n" "$*" >&2; }
-dbg()  { [ "$DEBUG_FLAG" != "0" ] && printf "[DEBUG] %s\n" "$*" >&2; }
+dbg()  {
+  if [ "$DEBUG_FLAG" != "0" ]; then
+    printf "[DEBUG] %s\n" "$*" >&2
+  fi
+  return 0
+}
 have_cmd() { command -v "$1" >/dev/null 2>&1; }
 can_sudo() { have_cmd sudo && sudo -n true 2>/dev/null; }
 is_root() { [ "$(id -u)" -eq 0 ]; }
