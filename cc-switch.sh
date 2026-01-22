@@ -477,10 +477,12 @@ if [[ "${1:-}" == "--list" ]]; then
 fi
 
 # ---- choose provider ----
-provider="${1:-}"
-if [[ -n "$provider" && "$provider" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+provider=""
+if [[ -n "${1:-}" && "${1}" != -* && "${1}" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+  provider="${1}"
   shift
-else
+fi
+if [[ -z "$provider" ]]; then
   provider="$default_provider"
 fi
 
@@ -544,9 +546,6 @@ if (typeof data.alwaysThinkingEnabled === 'undefined') data.alwaysThinkingEnable
 fs.writeFileSync(settingsPath, JSON.stringify(data, null, 2));
 console.error(`>>> Using provider: ${process.env.PROVIDER}`);
 NODE
-else
-  echo "✖ No provider selected and no default configured in $CONFIG" >&2
-  exit 1
 fi
 
 # ---- locate official CLI (absolute paths to avoid recursion) ----
