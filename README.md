@@ -85,14 +85,16 @@ default=kimi
 [kimi]
 ANTHROPIC_AUTH_TOKEN=sk-xxxxxxxxxxxxxxxx
 ANTHROPIC_BASE_URL=https://api.kimi.com/coding/
-ANTHROPIC_MODEL=kimi-for-coding          ; optional
-ANTHROPIC_SMALL_FAST_MODE=kimi-for-coding ; optional
+ANTHROPIC_DEFAULT_SONNET_MODEL=kimi-for-coding          ; optional
+ANTHROPIC_DEFAULT_HAIKU_MODEL=kimi-for-coding           ; optional
+ANTHROPIC_DEFAULT_OPUS_MODEL=kimi-for-coding            ; optional
 
 [glm]
 ANTHROPIC_AUTH_TOKEN=sk-xxxxxxxxxxxxxxxx
 ANTHROPIC_BASE_URL=https://open.bigmodel.cn/api/anthropic/
-ANTHROPIC_MODEL=glm-4-flash              ; optional
-ANTHROPIC_SMALL_FAST_MODE=glm-4-flash    ; optional
+ANTHROPIC_DEFAULT_SONNET_MODEL=glm-4.7              ; optional
+ANTHROPIC_DEFAULT_HAIKU_MODEL=glm-4.7               ; optional
+ANTHROPIC_DEFAULT_OPUS_MODEL=glm-4.7                ; optional
 ```
 
 Resolution order:
@@ -105,8 +107,9 @@ When a provider is chosen, the wrapper writes these keys into `~/.claude/setting
 
 - `ANTHROPIC_AUTH_TOKEN` (required)
 - `ANTHROPIC_BASE_URL` (required)
-- `ANTHROPIC_MODEL` (optional; only written if present)
-- `ANTHROPIC_SMALL_FAST_MODE` (optional; only written if present)
+- `ANTHROPIC_DEFAULT_SONNET_MODEL` (optional; only written if present)
+- `ANTHROPIC_DEFAULT_HAIKU_MODEL` (optional; only written if present)
+- `ANTHROPIC_DEFAULT_OPUS_MODEL` (optional; only written if present)
 
 ---
 
@@ -235,14 +238,16 @@ default=kimi
 [kimi]
 ANTHROPIC_AUTH_TOKEN=sk-xxxxxxxxxxxxxxxx
 ANTHROPIC_BASE_URL=https://api.kimi.com/coding/
-ANTHROPIC_MODEL=kimi-for-coding          ; 可选
-ANTHROPIC_SMALL_FAST_MODE=kimi-for-coding ; 可选
+ANTHROPIC_DEFAULT_SONNET_MODEL=kimi-for-coding          ; 可选
+ANTHROPIC_DEFAULT_HAIKU_MODEL=kimi-for-coding           ; 可选
+ANTHROPIC_DEFAULT_OPUS_MODEL=kimi-for-coding            ; 可选
 
 [glm]
 ANTHROPIC_AUTH_TOKEN=sk-xxxxxxxxxxxxxxxx
 ANTHROPIC_BASE_URL=https://open.bigmodel.cn/api/anthropic/
-ANTHROPIC_MODEL=glm-4-flash              ; 可选
-ANTHROPIC_SMALL_FAST_MODE=glm-4-flash    ; 可选
+ANTHROPIC_DEFAULT_SONNET_MODEL=glm-4.7              ; 可选
+ANTHROPIC_DEFAULT_HAIKU_MODEL=glm-4.7               ; 可选
+ANTHROPIC_DEFAULT_OPUS_MODEL=glm-4.7                ; 可选
 ```
 
 解析优先级：
@@ -255,8 +260,9 @@ ANTHROPIC_SMALL_FAST_MODE=glm-4-flash    ; 可选
 
 - `ANTHROPIC_AUTH_TOKEN`（必填）
 - `ANTHROPIC_BASE_URL`（必填）
-- `ANTHROPIC_MODEL`（可选，提供时写入）
-- `ANTHROPIC_SMALL_FAST_MODE`（可选，提供时写入）
+- `ANTHROPIC_DEFAULT_SONNET_MODEL`（可选，提供时写入）
+- `ANTHROPIC_DEFAULT_HAIKU_MODEL`（可选，提供时写入）
+- `ANTHROPIC_DEFAULT_OPUS_MODEL`（可选，提供时写入）
 
 ---
 

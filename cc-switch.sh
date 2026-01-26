@@ -515,11 +515,20 @@ if [[ -n "$provider" ]]; then
   base_url=$(get_ini_value "$provider" "ANTHROPIC_BASE_URL")
   [[ -z "${base_url:-}" ]] && base_url=$(get_ini_value "$provider" "BASE_URL") # backward compat
 
-  model=$(get_ini_value "$provider" "ANTHROPIC_MODEL")
-  [[ -z "${model:-}" ]] && model=$(get_ini_value "$provider" "MODEL")
+  default_sonnet=$(get_ini_value "$provider" "ANTHROPIC_DEFAULT_SONNET_MODEL")
+  default_haiku=$(get_ini_value "$provider" "ANTHROPIC_DEFAULT_HAIKU_MODEL")
+  default_opus=$(get_ini_value "$provider" "ANTHROPIC_DEFAULT_OPUS_MODEL")
 
-  small_fast=$(get_ini_value "$provider" "ANTHROPIC_SMALL_FAST_MODE")
-  [[ -z "${small_fast:-}" ]] && small_fast=$(get_ini_value "$provider" "SMALL_FAST_MODE")
+  legacy_model=$(get_ini_value "$provider" "ANTHROPIC_MODEL")
+  [[ -z "${legacy_model:-}" ]] && legacy_model=$(get_ini_value "$provider" "MODEL")
+
+  legacy_small_fast=$(get_ini_value "$provider" "ANTHROPIC_SMALL_FAST_MODE")
+  [[ -z "${legacy_small_fast:-}" ]] && legacy_small_fast=$(get_ini_value "$provider" "SMALL_FAST_MODE")
+
+  [[ -z "${default_sonnet:-}" ]] && default_sonnet="$legacy_model"
+  [[ -z "${default_haiku:-}" ]] && default_haiku="$legacy_small_fast"
+  [[ -z "${default_haiku:-}" ]] && default_haiku="$legacy_model"
+  [[ -z "${default_opus:-}" ]] && default_opus="$legacy_model"
 
   missing=()
   [[ -z "${auth_token:-}" ]] && missing+=("ANTHROPIC_AUTH_TOKEN")
@@ -531,7 +540,7 @@ if [[ -n "$provider" ]]; then
   fi
 
   export SETTINGS_PATH PROVIDER="$provider"
-  export AUTH_TOKEN="$auth_token" BASE_URL="$base_url" MODEL="$model" SMALL_FAST="$small_fast"
+  export AUTH_TOKEN="$auth_token" BASE_URL="$base_url" DEFAULT_SONNET_MODEL="$default_sonnet" DEFAULT_HAIKU_MODEL="$default_haiku" DEFAULT_OPUS_MODEL="$default_opus"
 
   node <<'NODE'
 const fs = require('fs');
@@ -545,8 +554,9 @@ const maybeSet = (key, val) => {
 };
 maybeSet('ANTHROPIC_AUTH_TOKEN', process.env.AUTH_TOKEN);
 maybeSet('ANTHROPIC_BASE_URL', process.env.BASE_URL);
-maybeSet('ANTHROPIC_MODEL', process.env.MODEL);
-maybeSet('ANTHROPIC_SMALL_FAST_MODE', process.env.SMALL_FAST);
+maybeSet('ANTHROPIC_DEFAULT_SONNET_MODEL', process.env.DEFAULT_SONNET_MODEL);
+maybeSet('ANTHROPIC_DEFAULT_HAIKU_MODEL', process.env.DEFAULT_HAIKU_MODEL);
+maybeSet('ANTHROPIC_DEFAULT_OPUS_MODEL', process.env.DEFAULT_OPUS_MODEL);
 
 fs.mkdirSync(claudeDir, { recursive: true });
 
@@ -629,14 +639,16 @@ default=kimi
 [kimi]
 ANTHROPIC_AUTH_TOKEN=sk-xxxxxxxxxxxxxxxx
 ANTHROPIC_BASE_URL=https://api.kimi.com/coding/
-ANTHROPIC_MODEL=kimi-for-coding
-ANTHROPIC_SMALL_FAST_MODE=kimi-for-coding
+ANTHROPIC_DEFAULT_SONNET_MODEL=kimi-for-coding
+ANTHROPIC_DEFAULT_HAIKU_MODEL=kimi-for-coding
+ANTHROPIC_DEFAULT_OPUS_MODEL=kimi-for-coding
 
 [glm]
 ANTHROPIC_AUTH_TOKEN=sk-xxxxxxxxxxxxxxxx
 ANTHROPIC_BASE_URL=https://open.bigmodel.cn/api/anthropic/
-ANTHROPIC_MODEL=glm-4.5
-ANTHROPIC_SMALL_FAST_MODE=glm-4.5-air
+ANTHROPIC_DEFAULT_SONNET_MODEL=glm-4.5
+ANTHROPIC_DEFAULT_HAIKU_MODEL=glm-4.5-air
+ANTHROPIC_DEFAULT_OPUS_MODEL=glm-4.5
 INI
   chmod 600 "$CONF_PATH" || true
 }
