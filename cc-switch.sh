@@ -87,11 +87,17 @@ find_claude_executable() {
   return 1
 }
 
-append_once() {
-  # append_once <file> <line>
-  local f="$1" line="$2"
+ensure_line_last() {
+  # ensure_line_last <file> <line> [legacy_line]
+  local f="$1" line="$2" legacy="${3:-}"
   [ -f "$f" ] || touch "$f"
-  grep -Fqx "$line" "$f" || printf "%s\n" "$line" >> "$f"
+  local tmp="${f}.tmp.$$"
+  if [[ -n "$legacy" ]]; then
+    awk -v line="$line" -v legacy="$legacy" '$0 != line && $0 != legacy {print} END {print line}' "$f" > "$tmp"
+  else
+    awk -v line="$line" '$0 != line {print} END {print line}' "$f" > "$tmp"
+  fi
+  mv "$tmp" "$f"
 }
 
 detect_shell_rc() {
@@ -138,11 +144,18 @@ set_node_version_defaults() {
 ensure_path_prefix() {
   local rc; rc="$(detect_shell_rc)"
   mkdir -p "${TARGET_HOME}/bin"
-  local export_line='export PATH="$TARGET_HOME/bin:$PATH"'
-  append_once "$rc" "$export_line"
+  local export_line='export PATH="$HOME/bin:$PATH"'
+  local legacy_line='export PATH="$TARGET_HOME/bin:$PATH"'
+  local targets=("$rc")
   # idempotent patch to common rc files
-  [ "$rc" != "${TARGET_HOME}/.bashrc" ] && [ -f "${TARGET_HOME}/.bashrc" ] && append_once "${TARGET_HOME}/.bashrc" "$export_line"
-  [ "$rc" != "${TARGET_HOME}/.zshrc" ] && [ -f "${TARGET_HOME}/.zshrc" ] && append_once "${TARGET_HOME}/.zshrc" "$export_line"
+  [ "$rc" != "${TARGET_HOME}/.bashrc" ] && targets+=("${TARGET_HOME}/.bashrc")
+  [ "$rc" != "${TARGET_HOME}/.zshrc" ] && targets+=("${TARGET_HOME}/.zshrc")
+  [ -f "${TARGET_HOME}/.profile" ] && targets+=("${TARGET_HOME}/.profile")
+  [ -f "${TARGET_HOME}/.bash_profile" ] && targets+=("${TARGET_HOME}/.bash_profile")
+  [ -f "${TARGET_HOME}/.bash_login" ] && targets+=("${TARGET_HOME}/.bash_login")
+  for target in "${targets[@]}"; do
+    ensure_line_last "$target" "$export_line" "$legacy_line"
+  done
   export PATH="${TARGET_HOME}/bin:$PATH"
 }
 
@@ -801,7 +814,7 @@ case "$CMD" in
     msg "Step 5/5: Writing sample config (if missing)..."
     write_sample_conf_if_absent
     msg "✅ Installation complete."
-    echo "Next: open a new terminal or run 'hash -r' and test 'claude --list'."
+    echo "Next: open a new terminal or source your shell rc (e.g., 'source ~/.bashrc'), then test 'claude --list'."
     verify
     ;;
   update)

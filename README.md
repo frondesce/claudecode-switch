@@ -43,13 +43,13 @@ What the installer does:
 
 1) Ensures Node.js (tries system package manager, then falls back to NVM when possible)  
 2) Installs the official Claude Code CLI via `curl -fsSL https://claude.ai/install.sh | bash`  
-3) Adds `~/bin` to your PATH (idempotent)  
+3) Adds `~/bin` to your PATH in shell rc/login files (idempotent)  
 4) Writes the wrapper to `~/bin/claude`  
 5) Creates a sample `~/.claude_providers.ini` if missing (new format for Claude Code >= 2.0)  
 
 Note: when using NVM, if downloading the official Node binary fails, the installer auto-retries with `NODEJS_ORG_MIRROR=https://npmmirror.com/mirrors/node` to avoid slow source builds.
 
-> Tip: After first install, open a new terminal (or run `hash -r`) so the new PATH takes effect.
+> Tip: After first install, open a new terminal or source the file your shell reads (e.g., `source ~/.bashrc`, `source ~/.zshrc`, or `source ~/.profile` for login shells) so the new PATH takes effect. If `claude` was cached, run `hash -r`.
 
 ---
 
@@ -138,7 +138,7 @@ You’ll see colored checks for:
 
 Common tips:
 
-- If `claude` doesn’t resolve to `~/bin/claude`, open a new terminal or run `hash -r`.
+- If `claude` doesn’t resolve to `~/bin/claude`, open a new terminal or source the file your shell reads (e.g., `~/.bashrc`, `~/.zshrc`, or `~/.profile` for login shells). If needed, run `hash -r`.
 - Ensure `~/bin` is **first** on your PATH.
 - Node 20+ is required; if glibc < 2.28 is detected, the installer automatically falls back to Node 18 for compatibility. It will try to upgrade via NodeSource/NVM (needs `curl`). If an existing nvm-installed Node is still glibc-incompatible, the script will attempt an NVM source build; otherwise you may need to rebuild manually (e.g. `nvm uninstall 18 && nvm install -s 18`).
 - If `curl` is missing, the installer will prompt to install it via your package manager (requires sudo); otherwise please install curl manually.
@@ -203,11 +203,11 @@ bash scripts/cc-switch.sh install
 
 1) 检查/安装 Node.js（优先包管理器，必要时回退 NVM）  
 2) 通过官方安装脚本安装 Claude Code CLI（`curl -fsSL https://claude.ai/install.sh | bash`）  
-3) 将 `~/bin` 添加到 PATH（可重复执行）  
+3) 将 `~/bin` 写入 shell rc/登录文件的 PATH（可重复执行）  
 4) 写入包装器 `~/bin/claude`  
 5) 若缺失则生成示例 `~/.claude_providers.ini`
 
-> 首次安装后建议重新打开一个终端（或执行 `hash -r`），让 PATH 设置生效。
+> 首次安装后建议重新打开终端，或执行当前 shell 读取的文件（如 `source ~/.bashrc`、`source ~/.zshrc`，登录 shell 则 `source ~/.profile`）让 PATH 生效；若 shell 缓存了 `claude`，再执行 `hash -r`。
 
 ---
 
@@ -291,7 +291,7 @@ bash scripts/cc-switch.sh status
 
 常见建议：
 
-- 如果 `claude` 没解析到 `~/bin/claude`，请新开终端或执行 `hash -r`。  
+- 如果 `claude` 没解析到 `~/bin/claude`，请新开终端或执行当前 shell 读取的文件（如 `~/.bashrc`、`~/.zshrc`，登录 shell 则 `~/.profile`）；必要时再执行 `hash -r`。  
 - 确保 `~/bin` 在 PATH **最前**。  
 - 需要 Node 20+；若检测到 glibc < 2.28，会自动回退到 Node 18 以兼容旧系统。脚本会尝试通过 NodeSource/NVM 升级（需要 `curl`）。若已有 nvm 的 Node 仍因 glibc 不兼容，脚本会尝试 NVM 源码编译；失败则可手动 `nvm uninstall 18 && nvm install -s 18` 重建。
 - 如果缺少 `curl`，安装器会询问是否用包管理器安装（需 sudo）；否则请手动安装。  
