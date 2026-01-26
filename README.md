@@ -5,7 +5,7 @@
 
 🌐 English | [中文版](#zh)
 
-A lightweight **PATH-based** wrapper for the official `@anthropic-ai/claude-code` CLI. It adds provider switching without modifying the official CLI.
+A lightweight **PATH-based** wrapper for the official Claude Code CLI. It adds provider switching without modifying the official CLI.
 
 With the `~/bin/claude` wrapper, you can quickly switch among providers that are compatible with the Anthropic API (Kimi/Moonshot, GLM/Zhipu, etc.) while keeping the official CLI untouched.
 
@@ -20,7 +20,7 @@ With the `~/bin/claude` wrapper, you can quickly switch among providers that are
 
 ## ✨ Features
 
-- **🛠️ One-click installer**: ensures Node/npm, installs the official CLI, and writes the wrapper.
+- **🛠️ One-click installer**: ensures Node, installs the official CLI, and writes the wrapper.
 - 🧩 Multiple providers via `~/.claude_providers.ini`.
 - 🌟 `default=` to set a default provider.
 - 🔀 `claude <provider>` to select a provider on the fly.
@@ -41,12 +41,11 @@ bash scripts/cc-switch.sh install
 
 What the installer does:
 
-1) Ensures Node.js/npm (tries system package manager, then falls back to NVM when possible)  
-2) Installs `@anthropic-ai/claude-code` globally  
+1) Ensures Node.js (tries system package manager, then falls back to NVM when possible)  
+2) Installs the official Claude Code CLI via `curl -fsSL https://claude.ai/install.sh | bash`  
 3) Adds `~/bin` to your PATH (idempotent)  
 4) Writes the wrapper to `~/bin/claude`  
 5) Creates a sample `~/.claude_providers.ini` if missing (new format for Claude Code >= 2.0)  
-6) If `npm -g` lacks permissions, falls back to installing CLI under `~/.npm-global` and adds it to PATH
 
 Note: when using NVM, if downloading the official Node binary fails, the installer auto-retries with `NODEJS_ORG_MIRROR=https://npmmirror.com/mirrors/node` to avoid slow source builds.
 
@@ -140,7 +139,7 @@ Common tips:
 - Ensure `~/bin` is **first** on your PATH.
 - Node 20+ is required; if glibc < 2.28 is detected, the installer automatically falls back to Node 18 for compatibility. It will try to upgrade via NodeSource/NVM (needs `curl`). If an existing nvm-installed Node is still glibc-incompatible, the script will attempt an NVM source build; otherwise you may need to rebuild manually (e.g. `nvm uninstall 18 && nvm install -s 18`).
 - If `curl` is missing, the installer will prompt to install it via your package manager (requires sudo); otherwise please install curl manually.
-- When falling back to NVM, the installer reloads nvm and switches to Node 20 so that the new node/npm are available in the current shell (avoids false failures).
+- When falling back to NVM, the installer reloads nvm and switches to Node 20 so that the new node is available in the current shell (avoids false failures).
 - Debug mode: set `CLAUDE_SWITCH_DEBUG=1` to print extra diagnostics (PATH, node resolution) if installation has issues.
   - When run as root (or via sudo), the installer can auto-install curl via apt/yum/pacman without needing passwordless sudo.
 - Very old distros: use **NVM** to install Node 20+ if system packages are outdated.
@@ -161,7 +160,7 @@ This project is licensed under the **MIT License**. See the `LICENSE` file for d
 
 [Back to English](#top) | 中文版
 
-> 一个基于 PATH 的轻量封装器，为官方 `@anthropic-ai/claude-code` CLI 增加 **Provider 切换** 能力；无需修改官方 CLI。
+> 一个基于 PATH 的轻量封装器，为官方 Claude Code CLI 增加 **Provider 切换** 能力；无需修改官方 CLI。
 
 通过 `~/bin/claude` 包装器，你可以在不触碰官方执行文件的前提下，快速切换兼容 Anthropic API 的服务商（如 Kimi/Moonshot、GLM/智谱等）。
 
@@ -176,7 +175,7 @@ This project is licensed under the **MIT License**. See the `LICENSE` file for d
 
 ## ✨ 功能点
 
-- **🛠️ 一键安装脚本**：自动安装 Node/npm、官方 CLI、包装器
+- **🛠️ 一键安装脚本**：自动安装 Node、官方 CLI、包装器
 - 🧩 `~/.claude_providers.ini` 统一管理多 Provider
 - 🌟 `default=` 设置默认 Provider
 - 🔀 `claude <provider>` 临时切换指定 Provider
@@ -199,8 +198,8 @@ bash scripts/cc-switch.sh install
 
 脚本功能：
 
-1) 检查/安装 Node.js 与 npm（优先包管理器，必要时回退 NVM）  
-2) 全局安装 `@anthropic-ai/claude-code`  
+1) 检查/安装 Node.js（优先包管理器，必要时回退 NVM）  
+2) 通过官方安装脚本安装 Claude Code CLI（`curl -fsSL https://claude.ai/install.sh | bash`）  
 3) 将 `~/bin` 添加到 PATH（可重复执行）  
 4) 写入包装器 `~/bin/claude`  
 5) 若缺失则生成示例 `~/.claude_providers.ini`
@@ -290,7 +289,7 @@ bash scripts/cc-switch.sh status
 - 确保 `~/bin` 在 PATH **最前**。  
 - 需要 Node 20+；若检测到 glibc < 2.28，会自动回退到 Node 18 以兼容旧系统。脚本会尝试通过 NodeSource/NVM 升级（需要 `curl`）。若已有 nvm 的 Node 仍因 glibc 不兼容，脚本会尝试 NVM 源码编译；失败则可手动 `nvm uninstall 18 && nvm install -s 18` 重建。
 - 如果缺少 `curl`，安装器会询问是否用包管理器安装（需 sudo）；否则请手动安装。  
-- 回退到 NVM 时，安装器会重新加载 nvm 并切到 Node 20，确保当前 shell 能识别新 node/npm，避免“假失败”。  
+- 回退到 NVM 时，安装器会重新加载 nvm 并切到 Node 20，确保当前 shell 能识别新 node，避免“假失败”。  
 - 调试模式：若安装有问题，可先设 `CLAUDE_SWITCH_DEBUG=1`，脚本会输出额外诊断信息（PATH、node 检测）。  
   - 以 root/sudo 运行时，脚本可以通过 apt/yum/pacman 自动安装 curl（不要求免密 sudo）。  
 - 老系统建议用 **NVM** 安装 Node 20+。  

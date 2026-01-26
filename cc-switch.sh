@@ -48,6 +48,45 @@ have_cmd() { command -v "$1" >/dev/null 2>&1; }
 can_sudo() { have_cmd sudo && sudo -n true 2>/dev/null; }
 is_root() { [ "$(id -u)" -eq 0 ]; }
 
+find_claude_on_path() {
+  local self_path="$1"
+  local entry candidate
+  local -a path_entries
+  IFS=':' read -r -a path_entries <<< "${PATH:-}"
+  for entry in "${path_entries[@]}"; do
+    [ -z "$entry" ] && continue
+    candidate="${entry%/}/claude"
+    if [ -x "$candidate" ] && [ "$candidate" != "$self_path" ]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+find_claude_executable() {
+  local self_path="$1"
+  local candidate
+  local known=(
+    "${HOME}/.local/bin/claude"
+    "${HOME}/.claude/bin/claude"
+    "/usr/local/bin/claude"
+    "/usr/bin/claude"
+    "/opt/homebrew/bin/claude"
+  )
+  for candidate in "${known[@]}"; do
+    if [ -x "$candidate" ] && [ "$candidate" != "$self_path" ]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+  if candidate="$(find_claude_on_path "$self_path")"; then
+    echo "$candidate"
+    return 0
+  fi
+  return 1
+}
+
 append_once() {
   # append_once <file> <line>
   local f="$1" line="$2"
@@ -183,7 +222,7 @@ set_nvm_path_if_valid() {
 }
 
 # ------------------------
-# Node/npm installation
+# Node installation
 # ------------------------
 install_node_with_pkgmgr() {
   if [[ "$GLIBC_BELOW_228" == "1" ]]; then
@@ -192,19 +231,19 @@ install_node_with_pkgmgr() {
   fi
   if have_cmd apt && can_sudo; then
     ensure_curl || return 1
-    msg "Installing node/npm via apt (NodeSource ${NODE_MAJOR}.x)..."
+    msg "Installing node via apt (NodeSource ${NODE_MAJOR}.x)..."
     curl -fsSL "${NODE_DISTRO_URL}" | sudo -E bash -
     sudo apt install -y nodejs
     return 0
   fi
   if have_cmd yum && can_sudo; then
-    msg "Installing node/npm via yum..."
-    sudo yum install -y nodejs npm
+    msg "Installing node via yum..."
+    sudo yum install -y nodejs
     return 0
   fi
   if have_cmd pacman && can_sudo; then
-    msg "Installing node/npm via pacman..."
-    sudo pacman -Sy --noconfirm nodejs npm
+    msg "Installing node via pacman..."
+    sudo pacman -Sy --noconfirm nodejs
     return 0
   fi
   if have_cmd brew; then
@@ -216,7 +255,7 @@ install_node_with_pkgmgr() {
 }
 
 install_node_with_nvm() {
-  msg "Installing node/npm via NVM (no sudo required)..."
+  msg "Installing node via NVM (no sudo required)..."
   if ! have_cmd curl; then
     warn "curl not found; cannot fetch nvm installer. Install curl or node ${MIN_NODE_VERSION}+ manually."
     return 1
@@ -250,8 +289,8 @@ try_nvm_source_build() {
   if install_node_with_nvm_source; then
     load_nvm_env && nvm use "${NODE_MAJOR}" >/dev/null 2>&1 || true
     hash -r
-    if have_cmd node && have_cmd npm && node_version_ok; then
-      msg "Installed node/npm via NVM (source build): $(node -v)"
+    if have_cmd node && node_version_ok; then
+      msg "Installed node via NVM (source build): $(node -v)"
       return 0
     fi
   fi
@@ -276,34 +315,33 @@ node_version_ok() {
   return 1
 }
 
-ensure_node_npm() {
+ensure_node() {
   local _had_errexit=0
   case "$-" in *e*) _had_errexit=1; set +e ;; esac
   restore_errexit() { [ "$_had_errexit" -eq 1 ] && set -e; }
   set_node_version_defaults
   NODE_GLIBC_INCOMPAT="0"
-  dbg "ensure_node_npm: user=$USER sudo_user=${SUDO_USER:-} target_home=$TARGET_HOME PATH=$PATH"
+  dbg "ensure_node: user=$USER sudo_user=${SUDO_USER:-} target_home=$TARGET_HOME PATH=$PATH"
   local attempted_source_build=0
-  local current_node current_npm
+  local current_node
   current_node="$(command -v node 2>/dev/null || true)"
-  current_npm="$(command -v npm 2>/dev/null || true)"
-  dbg "ensure_node_npm: current node=${current_node:-<none>} npm=${current_npm:-<none>} version=$(node -v 2>/dev/null || echo '-')"
-  dbg "ensure_node_npm: start"
+  dbg "ensure_node: current node=${current_node:-<none>} version=$(node -v 2>/dev/null || echo '-')"
+  dbg "ensure_node: start"
 
-  if set_nvm_path_if_valid && have_cmd node && have_cmd npm; then
+  if set_nvm_path_if_valid && have_cmd node; then
     if node_version_ok; then
-      msg "node & npm found (nvm): $(node -v) / npm $(npm -v)"
-      dbg "ensure_node_npm: early success via nvm path"
+      msg "node found (nvm): $(node -v)"
+      dbg "ensure_node: early success via nvm path"
       restore_errexit; return 0
     else
       warn "node found via nvm path but version/compatibility check failed; continuing installation..."
     fi
   fi
 
-  if have_cmd node && have_cmd npm; then
+  if have_cmd node; then
     if node_version_ok; then
-      msg "node & npm found: $(node -v) / npm $(npm -v)"
-      dbg "ensure_node_npm: success with existing node"
+      msg "node found: $(node -v)"
+      dbg "ensure_node: success with existing node"
       restore_errexit; return 0
     else
       warn "node found but version is below ${MIN_NODE_VERSION}: $(node -v). Attempting to install/upgrade..."
@@ -324,12 +362,12 @@ ensure_node_npm() {
     fi
   fi
 
-  warn "node/npm not found or too old. Attempting installation..."
-  if install_node_with_pkgmgr && have_cmd node && have_cmd npm && node_version_ok; then
-    msg "Installed node/npm via package manager: $(node -v)"
-    dbg "ensure_node_npm: success via pkgmgr"
+  warn "node not found or too old. Attempting installation..."
+  if install_node_with_pkgmgr && have_cmd node && node_version_ok; then
+    msg "Installed node via package manager: $(node -v)"
+    dbg "ensure_node: success via pkgmgr"
     restore_errexit; return 0
-  elif have_cmd node && have_cmd npm && ! node_version_ok; then
+  elif have_cmd node && ! node_version_ok; then
     warn "Package manager provided node $(node -v), which is below ${MIN_NODE_VERSION}. Falling back to NVM..."
   fi
 
@@ -345,14 +383,14 @@ ensure_node_npm() {
       fi
     fi
     hash -r
-    if have_cmd node && have_cmd npm && node_version_ok; then
-      msg "Installed node/npm via NVM: $(node -v)"
-      dbg "ensure_node_npm: success via nvm after install"
+    if have_cmd node && node_version_ok; then
+      msg "Installed node via NVM: $(node -v)"
+      dbg "ensure_node: success via nvm after install"
       restore_errexit; return 0
     fi
-    if set_nvm_path_if_valid && have_cmd node && have_cmd npm; then
-      msg "Installed node/npm via NVM: $(node -v)"
-      dbg "ensure_node_npm: success via set_nvm_path_if_valid after install"
+    if set_nvm_path_if_valid && have_cmd node; then
+      msg "Installed node via NVM: $(node -v)"
+      dbg "ensure_node: success via set_nvm_path_if_valid after install"
       restore_errexit; return 0
     fi
     if [[ "$NODE_GLIBC_INCOMPAT" == "1" ]]; then
@@ -375,53 +413,37 @@ ensure_node_npm() {
       restore_errexit; return 0
     fi
   fi
-  dbg "ensure_node_npm: end (failure path)"
+  dbg "ensure_node: end (failure path)"
   dbg "Final PATH=$PATH"
-  dbg "node=$(command -v node || echo '<none>') npm=$(command -v npm || echo '<none>') version=$(node -v 2>/dev/null || echo '<none>')"
-  err "Failed to install/upgrade node/npm to ${MIN_NODE_VERSION}+ automatically. Please install manually and re-run. (Set CLAUDE_SWITCH_DEBUG=1 for verbose logs)"
+  dbg "node=$(command -v node || echo '<none>') version=$(node -v 2>/dev/null || echo '<none>')"
+  err "Failed to install/upgrade node to ${MIN_NODE_VERSION}+ automatically. Please install manually and re-run. (Set CLAUDE_SWITCH_DEBUG=1 for verbose logs)"
   if [[ $_had_errexit -eq 1 ]]; then set -e; fi
   exit 1
 }
 
 ensure_claude_code_cli() {
-  msg "Ensuring @anthropic-ai/claude-code is installed globally..."
-  if npm i -g @anthropic-ai/claude-code >/dev/null 2>&1; then
+  msg "Ensuring Claude Code CLI is installed (official installer)..."
+  local existing
+  existing="$(find_claude_executable "$WRAPPER_PATH" || true)"
+  if [ -n "$existing" ]; then
+    msg "Claude Code CLI already found: ${existing}"
     return
   fi
 
-  warn "npm install failed. Attempting automatic cleanup and retry..."
-  npm uninstall -g @anthropic-ai/claude-code >/dev/null 2>&1 || true
-
-  local npm_root
-  npm_root="$(npm root -g 2>/dev/null || true)"
-  if [ -n "${npm_root}" ] && [ -d "${npm_root}/@anthropic-ai" ]; then
-    rm -rf "${npm_root}/@anthropic-ai/claude-code"
-    find "${npm_root}/@anthropic-ai" -maxdepth 1 -type d -name '.claude-code-*' -exec rm -rf {} +
-  fi
-
-  npm cache clean --force >/dev/null 2>&1 || true
-
-  if ! npm i -g @anthropic-ai/claude-code; then
-    warn "Global npm install failed (likely permissions). Trying user prefix ~/.npm-global..."
-    local user_prefix="${HOME}/.npm-global"
-    mkdir -p "${user_prefix}"
-    if npm config set prefix "${user_prefix}" >/dev/null 2>&1; then
-      export PATH="${user_prefix}/bin:${PATH}"
-      local rc; rc="$(detect_shell_rc)"
-      local export_line="export PATH=\"${user_prefix}/bin:\\\$PATH\""
-      append_once "$rc" "$export_line"
-      [ "$rc" != "${HOME}/.bashrc" ] && [ -f "${HOME}/.bashrc" ] && append_once "${HOME}/.bashrc" "$export_line"
-      [ "$rc" != "${HOME}/.zshrc" ] && [ -f "${HOME}/.zshrc" ] && append_once "${HOME}/.zshrc" "$export_line"
-      if npm i -g @anthropic-ai/claude-code; then
-        msg "Installed @anthropic-ai/claude-code into user prefix ${user_prefix}."
-        return
-      fi
-    else
-      warn "Failed to set npm user prefix; you may need to adjust npm permissions manually."
+  if ! have_cmd curl; then
+    if ! ensure_curl; then
+      err "curl is required to install Claude Code CLI automatically."
+      exit 1
     fi
-    err "Failed to install @anthropic-ai/claude-code automatically."
-    exit 1
   fi
+
+  msg "Installing Claude Code CLI via official installer..."
+  if curl -fsSL https://claude.ai/install.sh | bash; then
+    return
+  fi
+
+  err "Failed to install Claude Code CLI automatically."
+  exit 1
 }
 
 # ------------------------
@@ -549,28 +571,42 @@ NODE
 fi
 
 # ---- locate official CLI (absolute paths to avoid recursion) ----
-NPM_ROOT_G="$(npm root -g 2>/dev/null || true)"
-NPM_PREFIX_G="$(npm prefix -g 2>/dev/null || true)"
+SELF_PATH="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
+
+find_on_path() {
+  local entry candidate
+  local -a path_entries
+  IFS=':' read -r -a path_entries <<< "${PATH:-}"
+  for entry in "${path_entries[@]}"; do
+    [ -z "$entry" ] && continue
+    candidate="${entry%/}/claude"
+    if [[ -x "$candidate" && "$candidate" != "$SELF_PATH" ]]; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
 
 CANDIDATES=(
-  "$NPM_ROOT_G/@anthropic-ai/claude-code/dist/cli.js"
-  "$NPM_ROOT_G/@anthropic-ai/claude-code/cli.mjs"
+  "$HOME/.local/bin/claude"
+  "$HOME/.claude/bin/claude"
+  "/usr/local/bin/claude"
+  "/usr/bin/claude"
+  "/opt/homebrew/bin/claude"
 )
 
-# fallback to global shim (absolute path avoids calling this wrapper)
-if [[ -n "${NPM_PREFIX_G:-}" && -x "$NPM_PREFIX_G/bin/claude" ]]; then
-  CANDIDATES+=("$NPM_PREFIX_G/bin/claude")
+if found="$(find_on_path)"; then
+  CANDIDATES+=("$found")
 fi
 
 for p in "${CANDIDATES[@]}"; do
-  if [[ -f "$p" ]]; then
-    exec node "$p" "$@"
-  elif [[ -x "$p" ]]; then
+  if [[ -x "$p" ]]; then
     exec "$p" "$@"
   fi
 done
 
-echo "Official Claude CLI not found. Please install: npm i -g @anthropic-ai/claude-code" >&2
+echo "Official Claude CLI not found. Please install: curl -fsSL https://claude.ai/install.sh | bash" >&2
 exit 1
 SH
 
@@ -741,8 +777,8 @@ done
 
 case "$CMD" in
   install)
-    msg "Step 1/5: Ensuring node & npm..."
-    ensure_node_npm
+    msg "Step 1/5: Ensuring node..."
+    ensure_node
     dbg "Step 1 completed"
     msg "Step 2/5: Ensuring official Claude Code CLI..."
     ensure_claude_code_cli
