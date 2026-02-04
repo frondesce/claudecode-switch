@@ -34,9 +34,9 @@ With the `~/bin/claude` wrapper, you can quickly switch among providers that are
 ## 🛠️ Installation
 
 ```bash
-bash scripts/cc-switch.sh
+bash cc-switch.sh
 # or explicitly
-bash scripts/cc-switch.sh install
+bash cc-switch.sh install
 ```
 
 What the installer does:
@@ -67,10 +67,10 @@ claude glm
 claude --list
 
 # Wrapper maintenance
-bash scripts/cc-switch.sh update
-bash scripts/cc-switch.sh uninstall
-bash scripts/cc-switch.sh uninstall --purge
-bash scripts/cc-switch.sh status   # colored diagnostics
+bash cc-switch.sh update
+bash cc-switch.sh uninstall
+bash cc-switch.sh uninstall --purge
+bash cc-switch.sh status   # colored diagnostics
 ```
 
 ---
@@ -126,7 +126,7 @@ When a provider is chosen, the wrapper writes these keys into `~/.claude/setting
 
 Run:
 ```bash
-bash scripts/cc-switch.sh status
+bash cc-switch.sh status
 ```
 You’ll see colored checks for:
 
@@ -192,11 +192,11 @@ This project is licensed under the **MIT License**. See the `LICENSE` file for d
 ## 🛠️ 安装
 
 ```bash
-bash scripts/cc-switch.sh
+bash cc-switch.sh
 ```
 或显式：
 ```bash
-bash scripts/cc-switch.sh install
+bash cc-switch.sh install
 ```
 
 脚本功能：
@@ -220,10 +220,10 @@ claude glm          # 指定 glm 启动
 claude --list       # 列出 Provider（标注 default）
 
 # 包装器维护
-bash scripts/cc-switch.sh update
-bash scripts/cc-switch.sh uninstall
-bash scripts/cc-switch.sh uninstall --purge
-bash scripts/cc-switch.sh status
+bash cc-switch.sh update
+bash cc-switch.sh uninstall
+bash cc-switch.sh uninstall --purge
+bash cc-switch.sh status
 ```
 
 ---
@@ -279,7 +279,7 @@ ANTHROPIC_DEFAULT_OPUS_MODEL=glm-4.7                ; 可选
 
 运行：
 ```bash
-bash scripts/cc-switch.sh status
+bash cc-switch.sh status
 ```
 你会看到彩色输出，包括：
 
