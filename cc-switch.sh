@@ -455,6 +455,17 @@ ensure_claude_code_cli() {
     return
   fi
 
+  warn "Official installer failed. Falling back to npm install..."
+  if ! have_cmd npm; then
+    err "npm not found. Cannot fall back to npm install. Please install Claude Code CLI manually."
+    exit 1
+  fi
+
+  msg "Installing Claude Code CLI via npm..."
+  if npm install -g @anthropic-ai/claude-code; then
+    return
+  fi
+
   err "Failed to install Claude Code CLI automatically."
   exit 1
 }
