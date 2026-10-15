@@ -1,3 +1,8 @@
+> [!IMPORTANT]
+> **This project is archived and no longer maintained.**
+>
+> This repository is preserved for reference purposes.
+> No further updates, bug fixes, or support will be provided.
 <a id="top"></a>
 # claudecode-switch 🚀
 
